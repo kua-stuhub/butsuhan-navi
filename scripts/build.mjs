@@ -221,6 +221,7 @@ const data = {
   generatedAt: new Date().toISOString(),
   event: cfg.event,
   contact: cfg.contact,
+  form: cfg.form,
   categories,
   exhibitors,
 };

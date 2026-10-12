@@ -97,6 +97,12 @@ function cardHTML(e) {
 function renderDetail() {
   const e = S.detail, n = e.images.length;
   $("#headSlot").innerHTML = `<div class="dhead"><button type="button" class="back" id="back">‹ 一覧</button><h2>${esc(e.name)}</h2></div>`;
+  if (e.vacant) { // a space nobody has listed yet
+    const form = DATA?.form?.url ? `<p class="foot" style="margin-top:0">出展者の方へ：<a href="${esc(safeUrl(DATA.form.url))}" target="_blank" rel="noopener">${esc(DATA.form.label || "掲載フォーム")}</a>からお品書きを載せられます。</p>` : "";
+    $("#sbody").innerHTML = `<p class="dsum" id="dsum"><span>${esc(roomOf(e.space))}</span></p>
+      <div class="empty" style="margin-bottom:12px">このスペースのお品書きは、まだ掲載されていません。</div>${form}`;
+    $("#sbody").scrollTop = 0; sizeGallery(); return;
+  }
   const sns = e.sns.map((u) => `<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener nofollow">${esc(u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""))}</a>`).join("<br>");
   $("#sbody").innerHTML = `
     <p class="dsum" id="dsum"><span><b>${esc(e.space || "—")}</b> ${esc(roomOf(e.space))}</span><span>${e.tags.map((t) => esc(short(t))).join("・")}</span></p>
@@ -270,8 +276,9 @@ function renderMap() {
   const sel = S.detail ? S.detail.space : null;
   B.slice().sort((a, b) => P((a[1] + a[2]) / 2, (a[3] + a[4]) / 2)[1] - P((b[1] + b[2]) / 2, (b[3] + b[4]) / 2)[1]).forEach(([no, x1, x2, y1, y2]) => {
     const list = bySpace[String(no)], e = list && list[0], rc = no === "受付", hit = e && hf && shown.has(e.space), dim = hf && !hit && !rc;
-    const cls = ["booth", e ? "has" : "", hit ? "hit" : "", dim ? "dim" : "", rc ? "recept" : "", sel === String(no) ? "sel" : ""].join(" ");
-    let g = `<g class="${cls}" ${e ? `data-space="${esc(no)}" tabindex="0" role="button" aria-label="スペース${esc(no)} ${esc(list.map((x) => x.name).join("、"))}"` : ""}>`;
+    const cls = ["booth", e ? "has" : rc ? "" : "vacant", hit ? "hit" : "", dim ? "dim" : "", rc ? "recept" : "", sel === String(no) ? "sel" : ""].join(" ");
+    const label = e ? `スペース${esc(no)} ${esc(list.map((x) => x.name).join("、"))}` : `スペース${esc(no)}（掲載なし）`;
+    let g = `<g class="${cls}" ${rc ? "" : `data-space="${esc(no)}" tabindex="0" role="button" aria-label="${label}"`}>`;
     if (iso) g += `<polygon class="s1" points="${pts([P(x1, y2, 0), P(x2, y2, 0), P(x2, y2, Z), P(x1, y2, Z)])}"/><polygon class="s2" points="${pts([P(x1, y1, 0), P(x1, y2, 0), P(x1, y2, Z), P(x1, y1, Z)])}"/>`;
     g += `<polygon class="t" points="${pts(quad(x1, y1, x2, y2, Z))}"/>`;
     const [cx, cy] = P((x1 + x2) / 2, (y1 + y2) / 2, Z), fs = Math.min(13, Math.max(9, Math.min(x2 - x1, y2 - y1) * .55));
@@ -323,8 +330,9 @@ function focusBooth(no) {
   MV.tx = $("#mapbox").clientWidth / 2 - sx * MV.s; MV.ty = visH() / 2 - sy * MV.s; applyView(true);
 }
 function boothTapped(no) {
-  const list = bySpace[String(no)]; if (!list) return;
-  if (list.length === 1) openDetail(list[0], true);
+  const list = bySpace[String(no)];
+  if (!list) openDetail({ id: "", name: `スペース ${no}`, space: String(no), tags: [], comment: "", sns: [], images: [], vacant: true }, true);
+  else if (list.length === 1) openDetail(list[0], true);
   else { S.q = String(no); S.searchOpen = true; S.mode = "list"; S.detail = null; rerender(); if (!wide()) setSnap(1); }
 }
 function initMapGestures() {

@@ -50,7 +50,9 @@ button,input,select{font:inherit;color:inherit}
 .booth .s1{fill:var(--booth-side);stroke:var(--booth-stroke);stroke-width:.8}
 .booth .s2{fill:var(--booth-side2);stroke:var(--booth-stroke);stroke-width:.8}
 .booth text{font-family:var(--f-mono);font-weight:600;fill:var(--muted);pointer-events:none}
-.booth.has{cursor:pointer}
+.booth[data-space]{cursor:pointer}
+.booth.vacant .t{fill:var(--map-floor)}
+.booth.vacant .s1,.booth.vacant .s2{opacity:.55}
 .booth.has text{fill:var(--fg)}
 .booth.hit .t{fill:var(--accent)}
 .booth.hit .s1{fill:color-mix(in srgb,var(--accent) 75%,#000)}
