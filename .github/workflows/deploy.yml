@@ -1,0 +1,62 @@
+# サイトを作って GitHub Pages に公開する。
+# - main に変更を入れたとき
+# - 15分ごと（Notion の更新を自動で反映。混雑時は数分遅れることがある）
+# - 手動（Actions タブ →「サイトを更新」→ Run workflow）
+name: サイトを更新
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 画像圧縮ライブラリを入れる
+        run: npm install --no-audit --no-fund
+
+      - name: 前回の画像を再利用する
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: img-${{ github.run_id }}
+          restore-keys: img-
+
+      - name: サイトを作る
+        run: npm run build
+        env:
+          # Notion 連携用のキー。Settings → Secrets and variables → Actions に登録する。
+          # 未登録のあいだはダミーデータで公開される。
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
