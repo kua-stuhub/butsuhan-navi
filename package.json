@@ -1,0 +1,16 @@
+{
+  "name": "butsuhan-navi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "大瓜生山祭 物販ナビ（非公式）— 有志物販のお品書きWebカタログ",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:sample": "USE_SAMPLE=1 node scripts/build.mjs",
+    "preview": "python3 -m http.server 8080 -d dist"
+  },
+  "engines": { "node": ">=20" },
+  "optionalDependencies": {
+    "sharp": "0.33.5"
+  }
+}

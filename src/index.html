@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{{TITLE}}</title>
+<meta name="description" content="{{DESCRIPTION}}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{TITLE}}">
+<meta property="og:description" content="{{DESCRIPTION}}">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#ECEDEF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17181A" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Barlow:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="{{STYLE_CSS}}">
+<script src="{{APP_JS}}" defer></script>
+</head>
+<body>
+<div class="app">
+  <div class="sample" id="sampleBar" hidden>試運転中：表示している出展者・画像はダミーです</div>
+  <header class="top">
+    <h1>{{NAME}}<span class="yr">{{YEAR}}</span>物販ナビ</h1><span class="badge">非公式</span>
+    <span class="date">{{DATES}}</span>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="mapbox" id="mapbox"></div>
+    <div class="maplegend"><span><i style="background:var(--accent)"></i>絞り込みに一致</span><span><i style="background:var(--fav);border-radius:50%"></i>お気に入り</span></div>
+    <div class="mapctl" role="group" aria-label="地図の操作">
+      <button type="button" id="b-proj" aria-pressed="false" title="立体と平面を切り替え">平面</button>
+      <button type="button" id="b-in" aria-label="拡大">＋</button>
+      <button type="button" id="b-out" aria-label="縮小">－</button>
+    </div>
+
+    <section class="sheet" id="sheet" aria-label="出展者">
+      <div class="grab" id="grab">
+        <div class="bar"></div>
+        <div id="headSlot"></div>
+      </div>
+      <div class="sbody" id="sbody"><p class="loading">出展者を読み込んでいます…</p></div>
+    </section>
+  </div>
+</div>
+<noscript><p style="padding:16px">このサイトを見るには JavaScript を有効にしてください。</p></noscript>
+</body>
+</html>
