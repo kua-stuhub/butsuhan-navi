@@ -29,7 +29,8 @@
     "databaseTitle": "出展者",
     "props": {
       "name": "サークル名・作家名",
-      "publish": "公開OK",
+      "publish": "審査",
+      "publishValue": "公開",
       "space": "スペース番号",
       "tags": [
         "頒布：本・紙もの",

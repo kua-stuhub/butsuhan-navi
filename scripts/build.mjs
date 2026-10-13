@@ -2,7 +2,7 @@
 //
 // やること:
 //   1. 出展者データを集める
-//      - 環境変数 NOTION_TOKEN があれば Notion の「出展者」DBから「公開OK」の行だけ取得（本番）
+//      - 環境変数 NOTION_TOKEN があれば Notion の「出展者」DBから「審査」が公開の行だけ取得（本番）
 //      - なければ data/sample.json のダミーデータを使う（試運転）
 //   2. お品書き画像をダウンロードして、一覧用（小）と拡大用（大）の webp に圧縮する
 //   3. dist/ に公開用ファイル一式（index.html, app.js, style.css, data.json, layout.json, img/）を書き出す
@@ -147,13 +147,17 @@ async function resolveDatabase(token, dbId) {
 async function fromNotion(token, dbId) {
   dbId = await resolveDatabase(token, dbId);
   const P = cfg.notion.props;
+  // 「審査」がステータス列なら値が publishValue（公開）の行だけ、チェックボックス列ならチェック済みだけを読む
+  const publishFilter = P.publishValue
+    ? { property: P.publish, status: { equals: P.publishValue } }
+    : { property: P.publish, checkbox: { equals: true } };
   const pages = [];
   let cursor;
   do {
     const res = await fetch(`${NOTION()}/v1/databases/${dbId}/query`, {
       method: "POST",
       headers: notionHeaders(token),
-      body: JSON.stringify({ page_size: 100, start_cursor: cursor, filter: { property: P.publish, checkbox: { equals: true } } }),
+      body: JSON.stringify({ page_size: 100, start_cursor: cursor, filter: publishFilter }),
       signal: AbortSignal.timeout(30000),
     });
     if (!res.ok) throw new Error(`Notionの読み込みに失敗しました (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
