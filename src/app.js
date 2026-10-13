@@ -423,19 +423,65 @@ function bindEvents() {
     if (t.closest("#b-search")) { S.searchOpen = !(S.searchOpen || S.q); if (!S.searchOpen) S.q = ""; rerender(); if (S.searchOpen) $("#q")?.focus(); return; }
     if (t.closest("#clear")) { S.tags.clear(); S.q = ""; rerender(); return; }
     if (t.closest("#b-proj")) { S.proj = S.proj === "iso" ? "flat" : "iso"; store.set("bn_proj", S.proj); $("#b-proj").textContent = S.proj === "iso" ? "平面" : "立体"; renderMap(); return; }
-    if (t.closest("#b-in")) { zoomAt($("#mapbox").clientWidth / 2, visH() / 2, 1.5, true); return; }
-    if (t.closest("#b-out")) { zoomAt($("#mapbox").clientWidth / 2, visH() / 2, 1 / 1.5, true); return; }
+    if (t.closest("#b-help")) { openHelp(); return; }
+    if (t.closest("[data-help-close]")) { closeHelp(); return; }
+    if (t.closest("#copyMail")) { copyMail(t.closest("#copyMail")); return; }
   });
   document.addEventListener("input", (ev) => {
     if (ev.target.id === "q") { S.q = ev.target.value; const pos = ev.target.selectionStart; renderSheet(); renderMap(); const q = $("#q"); q.focus(); q.setSelectionRange(pos, pos); }
   });
   document.addEventListener("keydown", (ev) => {
     if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches(".card,.booth[data-space]")) { ev.preventDefault(); ev.target.click(); }
+    if (ev.key === "Escape" && !$("#help").hidden) { closeHelp(); return; }
     if (ev.key === "Escape" && S.mode === "detail" && !document.querySelector(".lb")) backToList();
   });
   let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { placeSheet(); renderMap(); sizeGallery(); }, 120); });
   // the browser must never scroll the app shell itself (it would push the map off screen)
   ["#stage", ".app"].forEach((s) => { const el = $(s); el.addEventListener("scroll", () => { el.scrollTop = 0; el.scrollLeft = 0; }); });
+}
+
+
+/* ---------- help modal: how to use + contact ---------- */
+let helpReturn = null;
+function renderHelp() {
+  const C = DATA?.contact || {}, org = DATA?.org?.name || "", form = DATA?.form?.url;
+  const updated = DATA ? new Date(DATA.generatedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+  const row = (g, text) => `<li><span class="g">${g}</span><span>${text}</span></li>`;
+  $("#helpBody").innerHTML = `
+    <h3>地図</h3>
+    <ul class="help-list">
+      ${row("ドラッグ", "地図を動かす")}
+      ${row("2本指", "広げて拡大、つまんで縮小")}
+      ${row("ダブルタップ", "その場所を拡大")}
+      ${row("タップ", "スペースを押すと、そのサークルの詳細が開きます")}
+      ${row("平面／立体", "右上のボタンで、地図の見え方を切り替え")}
+    </ul>
+    <h3>お問い合わせ</h3>
+    <div class="help-contact">
+      ${org ? `<div class="org">運営：${esc(org)}</div>` : ""}
+      <p>掲載内容の修正・削除、そのほかのお問い合わせはこちらへ。修正・削除は、掲載時の連絡先で本人確認をしてから対応します。</p>
+      ${C.email ? `<div class="mailrow"><span class="addr" id="mailAddr">${esc(C.email)}</span><button type="button" id="copyMail">コピー</button></div>` : ""}
+      ${C.url ? `<p><a href="${esc(safeUrl(C.url))}" target="_blank" rel="noopener">${esc(C.label || C.url)}</a></p>` : ""}
+    </div>
+    ${form ? `<h3>出展者の方へ</h3><a class="help-form" href="${esc(safeUrl(form))}" target="_blank" rel="noopener">掲載フォームを開く ›</a>` : ""}
+    <p class="help-note">有志による非公式の取り組みです。大学・学園祭実行委員会・物販イベント主催とは関係ありません。${updated ? `<br>最終更新 ${esc(updated)}` : ""}</p>`;
+}
+function openHelp() {
+  helpReturn = document.activeElement; renderHelp();
+  const h = $("#help"); h.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => h.classList.add("open")));
+  $("#help .help-card").focus({ preventScroll: true });
+}
+function closeHelp() {
+  const h = $("#help"); if (h.hidden) return;
+  h.classList.remove("open");
+  setTimeout(() => { h.hidden = true; helpReturn?.focus?.(); }, matchMedia("(prefers-reduced-motion:reduce)").matches ? 0 : 230);
+}
+function copyMail(btn) {
+  const addr = $("#mailAddr")?.textContent || "";
+  const done = () => { btn.textContent = "コピーしました"; setTimeout(() => (btn.textContent = "コピー"), 1600); };
+  const fallback = () => { const r = document.createRange(); r.selectNodeContents($("#mailAddr")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "選択しました"; setTimeout(() => (btn.textContent = "コピー"), 1600); };
+  try { navigator.clipboard.writeText(addr).then(done, fallback); } catch { fallback(); }
 }
 
 /* ---------- boot ---------- */

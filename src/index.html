@@ -31,9 +31,8 @@
     <div class="mapbox" id="mapbox"></div>
     <div class="maplegend"><span><i style="background:var(--accent)"></i>絞り込みに一致</span><span><i style="background:var(--fav);border-radius:50%"></i>お気に入り</span></div>
     <div class="mapctl" role="group" aria-label="地図の操作">
+      <button type="button" id="b-help" class="help-btn" aria-label="使い方とお問い合わせ" aria-haspopup="dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.4 9.3a2.7 2.7 0 0 1 5.2 1c0 1.8-2.6 2.3-2.6 3.9"/><circle cx="12" cy="17.4" r=".9" fill="currentColor" stroke="none"/></svg></button>
       <button type="button" id="b-proj" aria-pressed="false" title="立体と平面を切り替え">平面</button>
-      <button type="button" id="b-in" aria-label="拡大">＋</button>
-      <button type="button" id="b-out" aria-label="縮小">－</button>
     </div>
 
     <section class="sheet" id="sheet" aria-label="出展者">
@@ -44,6 +43,13 @@
       <div class="sbody" id="sbody"><p class="loading">出展者を読み込んでいます…</p></div>
     </section>
   </div>
+</div>
+<div class="help" id="help" hidden>
+  <div class="help-scrim" data-help-close></div>
+  <section class="help-card" role="dialog" aria-modal="true" aria-labelledby="help-title" tabindex="-1">
+    <header class="help-head"><h2 id="help-title">使い方・お問い合わせ</h2><button type="button" class="help-x" data-help-close aria-label="閉じる">×</button></header>
+    <div class="help-body" id="helpBody"></div>
+  </section>
 </div>
 <noscript><p style="padding:16px">このサイトを見るには JavaScript を有効にしてください。</p></noscript>
 </body>
