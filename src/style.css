@@ -183,3 +183,4 @@ button,input,select{font:inherit;color:inherit}
 
 .loading{color:var(--muted);font-size:13px;text-align:center;padding-block:28px}
 .foot a{color:inherit}
+.foot .mail{user-select:all;-webkit-user-select:all;font-weight:700;color:var(--fg)}

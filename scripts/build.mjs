@@ -119,14 +119,40 @@ async function processImage(url, key, label) {
 }
 
 /* ---------------- data: Notion ---------------- */
+const NOTION = () => process.env.NOTION_API_BASE || "https://api.notion.com";
+const notionHeaders = (token) => ({ Authorization: `Bearer ${token}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" });
+
+// config.json の databaseId で見つからないとき（ワークスペースを移したときなど）は、
+// 連携キーが見られるデータベースの中から名前（例：「出展者」）で探す。
+async function resolveDatabase(token, dbId) {
+  if (dbId) {
+    const res = await fetch(`${NOTION()}/v1/databases/${dbId}`, { headers: notionHeaders(token), signal: AbortSignal.timeout(30000) });
+    if (res.ok) return dbId;
+    if (res.status === 401) throw new Error("Notionの連携キーが正しくありません（GitHubの NOTION_TOKEN を確認してください）");
+  }
+  const title = cfg.notion.databaseTitle || "出展者";
+  const res = await fetch(`${NOTION()}/v1/search`, {
+    method: "POST", headers: notionHeaders(token), signal: AbortSignal.timeout(30000),
+    body: JSON.stringify({ query: title, filter: { property: "object", value: "database" }, page_size: 20 }),
+  });
+  if (!res.ok) throw new Error(`Notionの検索に失敗しました (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
+  const hits = (await res.json()).results.filter((d) => (d.title || []).map((t) => t.plain_text).join("").trim() === title);
+  if (!hits.length) throw new Error(`データベース「${title}」が見つかりません。Notionでページに連携（接続）を追加したか確認してください`);
+  if (hits.length > 1) warn(`「${title}」という名前のデータベースが${hits.length}個あります。最初のものを使います`);
+  const id = hits[0].id.replace(/-/g, "");
+  warn(`config.json の databaseId を ${id} に書き換えておくと、次から探す手間が省けます`);
+  return id;
+}
+
 async function fromNotion(token, dbId) {
+  dbId = await resolveDatabase(token, dbId);
   const P = cfg.notion.props;
   const pages = [];
   let cursor;
   do {
-    const res = await fetch(`${process.env.NOTION_API_BASE || "https://api.notion.com"}/v1/databases/${dbId}/query`, {
+    const res = await fetch(`${NOTION()}/v1/databases/${dbId}/query`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Notion-Version": "2022-06-28", "Content-Type": "application/json" },
+      headers: notionHeaders(token),
       body: JSON.stringify({ page_size: 100, start_cursor: cursor, filter: { property: P.publish, checkbox: { equals: true } } }),
       signal: AbortSignal.timeout(30000),
     });
@@ -220,6 +246,7 @@ const data = {
   mode: live ? "live" : "sample",
   generatedAt: new Date().toISOString(),
   event: cfg.event,
+  org: cfg.org,
   contact: cfg.contact,
   form: cfg.form,
   categories,

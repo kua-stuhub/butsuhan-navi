@@ -1,5 +1,10 @@
 {
   "_説明": "サイト全体の設定。年が変わったら event を書き換える。秘密の値（Notionのトークン）はここに書かない。",
+  "org": {
+    "_説明": "運営団体。サイトのフッターに表示する。",
+    "name": "KUA StuHUB（非公式）",
+    "email": "kua.stuhub@gmail.com"
+  },
   "event": {
     "name": "大瓜生山祭",
     "year": 2026,
@@ -8,7 +13,8 @@
     "description": "大瓜生山祭2026の有志物販に出展するサークル・作家のお品書きをまとめた、非公式のWebカタログです。"
   },
   "contact": {
-    "_説明": "掲載の修正・削除の窓口。決まったら url と label を入れる。空ならサイトに窓口リンクを出さない。",
+    "_説明": "掲載の修正・削除の窓口。email はそのまま文字で表示する。X などのURLが決まったら url と label を入れる。",
+    "email": "kua.stuhub@gmail.com",
     "label": "",
     "url": ""
   },
@@ -18,8 +24,9 @@
     "url": "https://tally.so/r/XxV2yL"
   },
   "notion": {
-    "_説明": "出展者データベースのID（秘密ではない）と、列の名前。Notionで列名を変えたらここも合わせる。",
-    "databaseId": "d2b94ba740f64430b89a7626af97c1b1",
+    "_説明": "出展者データベースのID（秘密ではない）と名前、列の名前。IDで見つからないときは名前で自動的に探す。Notionで列名を変えたらここも合わせる。",
+    "databaseId": "fddd14f8ecf583e7b28601e476015ffd",
+    "databaseTitle": "出展者",
     "props": {
       "name": "サークル名・作家名",
       "publish": "公開OK",

@@ -67,7 +67,9 @@ function renderSheet() {
   const counts = {}; X.forEach((e) => e.tags.forEach((t) => (counts[t] = (counts[t] || 0) + 1)));
   const oc = CATS.find((c) => c.name === S.openCat);
   const updated = DATA ? new Date(DATA.generatedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-  const contact = DATA?.contact?.url ? `<a href="${esc(safeUrl(DATA.contact.url))}" target="_blank" rel="noopener">${esc(DATA.contact.label || "窓口")}</a>` : "窓口アカウント";
+  const C = DATA?.contact || {};
+  const contact = [C.email ? `<span class="mail">${esc(C.email)}</span>` : "", C.url ? `<a href="${esc(safeUrl(C.url))}" target="_blank" rel="noopener">${esc(C.label || "窓口")}</a>` : ""].filter(Boolean).join(" または ") || "運営";
+  const org = DATA?.org?.name ? `運営：${esc(DATA.org.name)}<br>` : "";
   $("#sbody").innerHTML = `
     ${S.searchOpen || S.q ? `<div class="search">${searchIco}<input id="q" type="search" placeholder="サークル名・スペース番号" value="${esc(S.q)}" autocomplete="off" enterkeyhint="search"></div>` : ""}
     <div class="cats" role="group" aria-label="頒布するもので絞り込み">
@@ -78,7 +80,7 @@ function renderSheet() {
     ${oc ? `<div class="chips sub">${oc.tags.filter((t) => counts[t] || known.has(t)).map((t) => `<button type="button" class="chip" data-tag="${esc(t)}" aria-pressed="${S.tags.has(t)}">${esc(short(t))}<small>${counts[t] || 0}</small></button>`).join("")}</div>` : ""}
     <div class="grid">${list.length ? list.map(cardHTML).join("") :
       `<div class="empty">${S.scope === "fav" && !favs.size ? "お気に入りはまだありません。<br>カードの☆を押すと、ここに集まります。<br>この端末のブラウザにだけ保存されます。" : X.length ? "条件に合う出展者はいません。<br>タグを減らすか、検索語を変えてください。" : "掲載中の出展者はまだいません。<br>掲載が始まるまでお待ちください。"}</div>`}</div>
-    <p class="foot">${S.sort === "shuffle" ? "並び順は見る人ごとにシャッフルされるので、特定の出展者がいつも上に来ることはありません。<br>" : ""}${updated ? `最終更新 ${esc(updated)}<br>` : ""}有志による非公式の個人制作です。大学・学園祭実行委員会・物販イベント主催とは関係ありません。掲載内容の修正・削除は${contact}までご連絡ください。</p>`;
+    <p class="foot">${S.sort === "shuffle" ? "並び順は見る人ごとにシャッフルされるので、特定の出展者がいつも上に来ることはありません。<br>" : ""}${updated ? `最終更新 ${esc(updated)}<br>` : ""}${org}有志による非公式の取り組みです。大学・学園祭実行委員会・物販イベント主催とは関係ありません。掲載内容の修正・削除は${contact}までご連絡ください。</p>`;
 }
 let known = new Set();
 function thumbHTML(e) {
