@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>配置図エディタ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Barlow:wght@500;600&display=swap">
+<style>
+/*
+  大瓜生山祭 物販ナビ（非公式）— 配置図エディタ
+  data/layout.json（部屋とスペースの座標）を作る・直すための道具。PC のブラウザで開く。
+  ネットに何も送らない。保存は「書き出す」で layout.json をダウンロードして、data/ に上書きする。
+*/
+:root{
+  --bg:#ECEDEF;--panel:#F7F7F8;--card:#FFFFFF;--fg:#1D1E20;--muted:#6B6E73;--line:#D5D7DB;--line2:#C3C6CB;
+  --accent:#C8553D;--accent-ink:#fff;--sel:#2F6FDE;--warn:#B7791F;--bad:#C0392B;--ok:#2E7D4F;
+  --room:#E3E5E8;--room-stroke:#8C9096;--booth:#FFFFFF;--booth-stroke:#5D6066;
+  --f:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
+  --f-num:"Barlow","Zen Kaku Gothic New",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#17181A;--panel:#1F2023;--card:#26282B;--fg:#ECEDEF;--muted:#9A9DA3;--line:#35373B;--line2:#45484D;
+  --room:#2A2C30;--room-stroke:#7C8086;--booth:#34363A;--booth-stroke:#A3A6AC;--sel:#6E9BFF;
+}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--f);display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+
+/* 上のバー */
+.top{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.top h1{font-size:15px;margin:0 8px 0 0;font-weight:700;white-space:nowrap}
+.top h1 small{font-weight:500;color:var(--muted);margin-left:6px}
+.sp{flex:1}
+.btn{border:1px solid var(--line2);background:var(--card);border-radius:8px;padding:5px 11px;cursor:pointer;white-space:nowrap;line-height:1.4}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.small{padding:3px 8px;font-size:12.5px}
+.btn:disabled{opacity:.4;cursor:default}
+.op{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px}
+.op input[type=range]{width:90px}
+
+/* 本体 */
+.main{display:grid;grid-template-columns:52px 1fr 300px;min-height:0}
+.tools{display:flex;flex-direction:column;gap:4px;padding:8px 6px;border-right:1px solid var(--line);background:var(--panel)}
+.tool{width:40px;height:40px;border:1px solid transparent;border-radius:9px;background:none;cursor:pointer;display:grid;place-items:center;position:relative}
+.tool:hover{background:var(--card);border-color:var(--line)}
+.tool[aria-pressed=true]{background:var(--fg);color:var(--bg)}
+.tool kbd{position:absolute;right:2px;bottom:0;font:600 9px var(--f-num);opacity:.55}
+.tool svg{width:20px;height:20px}
+.tsep{height:1px;background:var(--line);margin:4px 2px}
+
+.stagewrap{position:relative;min-width:0;min-height:0}
+#stage{width:100%;height:100%;display:block;background:var(--bg);touch-action:none;user-select:none}
+#stage.pan{cursor:grab}#stage.panning{cursor:grabbing}#stage.draw{cursor:crosshair}
+.hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);background:color-mix(in srgb,var(--panel) 88%,transparent);padding:4px 9px;border-radius:7px;border:1px solid var(--line);pointer-events:none}
+.zoomctl{position:absolute;right:12px;bottom:10px;display:flex;gap:4px}
+.empty{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.empty>div{pointer-events:auto;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;max-width:440px;text-align:center}
+.empty h2{margin:0 0 6px;font-size:17px}
+.empty p{margin:0 0 14px;color:var(--muted);font-size:13px}
+.empty .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.empty[hidden]{display:none}
+.drop{outline:3px dashed var(--sel);outline-offset:-10px}
+
+/* SVG */
+.g-room rect{fill:var(--room);stroke:var(--room-stroke);stroke-width:1.2;vector-effect:non-scaling-stroke;pointer-events:none}
+#stage.hasbg .g-room rect{fill-opacity:.3}
+#stage.hasbg .g-booth rect{fill-opacity:.55}
+.g-room .hit{fill:none;stroke:transparent;pointer-events:stroke;cursor:move}
+.g-room text{fill:var(--muted);font:600 18px var(--f-num);letter-spacing:.04em;cursor:move}
+.g-booth rect{fill:var(--booth);stroke:var(--booth-stroke);stroke-width:1;vector-effect:non-scaling-stroke}
+.g-booth text{fill:var(--fg);font:600 12px var(--f-num);pointer-events:none;dominant-baseline:central}
+.g-booth.recept rect{fill:var(--line)}
+.g-booth.bad rect{fill:color-mix(in srgb,var(--bad) 22%,var(--booth));stroke:var(--bad)}
+.g-room.sel rect,.g-booth.sel rect{stroke:var(--sel);stroke-width:2.4}
+.g-room.sel rect{fill:color-mix(in srgb,var(--sel) 10%,var(--room))}
+.g-booth.sel rect{fill:color-mix(in srgb,var(--sel) 16%,var(--booth))}
+.handle{fill:var(--card);stroke:var(--sel);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.marquee{fill:color-mix(in srgb,var(--sel) 10%,transparent);stroke:var(--sel);stroke-dasharray:4 3;vector-effect:non-scaling-stroke}
+.ghost{fill:color-mix(in srgb,var(--accent) 14%,transparent);stroke:var(--accent);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.ghostline{stroke:var(--accent);stroke-width:1;vector-effect:non-scaling-stroke}
+.grid line{stroke:var(--line);vector-effect:non-scaling-stroke}
+
+/* 右パネル */
+.side{border-left:1px solid var(--line);background:var(--panel);overflow:auto;min-height:0}
+.sec{padding:12px 14px;border-bottom:1px solid var(--line)}
+.sec h3{margin:0 0 8px;font-size:12.5px;color:var(--muted);font-weight:700;letter-spacing:.04em;display:flex;align-items:center;gap:6px}
+.sec h3 .n{margin-left:auto;font-family:var(--f-num)}
+.f{display:grid;grid-template-columns:62px 1fr;gap:6px 8px;align-items:center}
+.f label{font-size:12.5px;color:var(--muted)}
+.f input,.f select{width:100%;border:1px solid var(--line2);background:var(--card);border-radius:7px;padding:4px 8px;min-width:0}
+.f input:focus,.f select:focus{outline:2px solid var(--sel);outline-offset:-1px;border-color:transparent}
+.f4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.f4 label{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.f4 input{width:100%;border:1px solid var(--line2);background:var(--card);border-radius:7px;padding:3px 6px;min-width:0;font-family:var(--f-num)}
+.acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.muted{color:var(--muted);font-size:12.5px;margin:0}
+.issues{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.issues li{font-size:12.5px;padding:5px 8px;border-radius:7px;background:var(--card);border:1px solid var(--line);cursor:pointer;display:flex;gap:6px}
+.issues li:hover{border-color:var(--muted)}
+.issues li i{font-style:normal;flex:none}
+.issues li.bad i{color:var(--bad)}.issues li.warn i{color:var(--warn)}
+.okline{color:var(--ok);font-size:12.5px;margin:0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.stats div{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 4px}
+.stats b{display:block;font:600 18px var(--f-num)}
+.stats span{font-size:11px;color:var(--muted)}
+.keys{font-size:12px;color:var(--muted);display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0}
+.keys dt{font-family:var(--f-num);font-weight:600;color:var(--fg)}
+.keys dd{margin:0}
+
+/* ダイアログ */
+.dlg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:grid;place-items:center;z-index:10}
+.dlg[hidden]{display:none}
+.dlg>div{background:var(--card);border-radius:14px;padding:18px 18px 14px;width:min(400px,92vw);box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.dlg h2{margin:0 0 4px;font-size:16px}
+.dlg p{margin:0 0 12px;color:var(--muted);font-size:12.5px}
+.dlg .acts{justify-content:flex-end;margin-top:14px}
+.prev>div{width:min(980px,94vw);height:min(680px,88vh);display:grid;grid-template-rows:auto 1fr auto;padding:14px}
+.prev svg{width:100%;height:100%;background:var(--bg);border-radius:10px}
+.pv-floor{fill:var(--room);stroke:var(--room-stroke);stroke-width:1.2}
+.pv-wall{fill:none;stroke:var(--room-stroke);stroke-width:1.2}
+.pv-t{fill:var(--booth);stroke:var(--booth-stroke);stroke-width:.8}
+.pv-s1{fill:color-mix(in srgb,var(--booth-stroke) 35%,var(--booth));stroke:var(--booth-stroke);stroke-width:.8}
+.pv-s2{fill:color-mix(in srgb,var(--booth-stroke) 55%,var(--booth));stroke:var(--booth-stroke);stroke-width:.8}
+.pv-txt{font:600 11px var(--f-num);fill:var(--fg)}
+.pv-label{font:600 18px var(--f-num);fill:var(--muted);letter-spacing:.06em}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 16px;border-radius:9px;font-size:13px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>配置図エディタ<small>物販ナビ（非公式）</small></h1>
+  <button class="btn" id="b-open" title="layout.json を開く">開く</button>
+  <button class="btn" id="b-bg" title="配置図の画像（PNG / JPG）を下絵にする">下絵を読み込む</button>
+  <label class="op" id="op-wrap" hidden>下絵の濃さ<input type="range" id="op" min="0" max="100" value="55"></label>
+  <span class="sp"></span>
+  <button class="btn small" id="b-undo" title="元に戻す（Ctrl+Z）">↶ 戻す</button>
+  <button class="btn small" id="b-redo" title="やり直す（Ctrl+Shift+Z）">↷ 進む</button>
+  <button class="btn" id="b-prev" title="サイトと同じ立体表示で確認">立体で確認</button>
+  <button class="btn" id="b-copy" title="layout.json の中身をコピー">コピー</button>
+  <button class="btn pri" id="b-save" title="layout.json をダウンロード">書き出す</button>
+  <input type="file" id="f-json" accept=".json,application/json" hidden>
+  <input type="file" id="f-img" accept="image/*" hidden>
+</header>
+
+<div class="main">
+  <nav class="tools" aria-label="道具">
+    <button class="tool" data-tool="select" title="選択・移動（V）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M5 3l14 8-6 1.6L10 19z"/></svg><kbd>V</kbd></button>
+    <button class="tool" data-tool="room" title="部屋を描く（R）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.5" y="5" width="17" height="14" rx="1"/><path d="M3.5 9h17" opacity=".5"/></svg><kbd>R</kbd></button>
+    <button class="tool" data-tool="booth" title="スペースを1つ描く（B）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="6" y="9" width="12" height="6" rx=".5"/></svg><kbd>B</kbd></button>
+    <button class="tool" data-tool="row" title="スペースを並べて描く（S）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2.5" y="9" width="19" height="6" rx=".5"/><path d="M7.3 9v6M12 9v6M16.7 9v6"/></svg><kbd>S</kbd></button>
+    <div class="tsep"></div>
+    <button class="tool" data-tool="pan" title="画面を動かす（H／スペースを押しながらドラッグ）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V6.5a1.5 1.5 0 013 0V11m0-5.5V5a1.5 1.5 0 013 0v6m0-4.5a1.5 1.5 0 013 0V13c0 4-2.5 7-6.5 7S6 17.5 4.5 15l-1-1.8a1.4 1.4 0 012.3-1.5L8 13.5"/></svg><kbd>H</kbd></button>
+    <button class="tool" id="t-grid" title="グリッドに吸着（G）" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 9h16M4 15h16M9 4v16M15 4v16"/></svg><kbd>G</kbd></button>
+  </nav>
+
+  <div class="stagewrap" id="wrap">
+    <svg id="stage" xmlns="http://www.w3.org/2000/svg"><g id="vp"><g id="bgl"></g><g id="gridl" class="grid"></g><g id="rooml"></g><g id="boothl"></g><g id="ovl"></g></g></svg>
+    <div class="empty" id="empty">
+      <div>
+        <h2>配置図をつくる</h2>
+        <p>今の配置図を直すなら <b>layout.json</b> を、新しく作るなら配置図の<b>画像</b>を開いてください。ファイルをここにドラッグしても開けます。</p>
+        <div class="row"><button class="btn pri" id="e-open">layout.json を開く</button><button class="btn" id="e-bg">画像から新しく作る</button></div>
+        <div class="row" id="e-draft" hidden style="margin-top:10px"><button class="btn" id="e-restore">前回の作業の続きから</button></div>
+      </div>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="zoomctl"><button class="btn small" id="z-out" title="縮小">−</button><button class="btn small num" id="z-fit" title="全体を表示">全体</button><button class="btn small" id="z-in" title="拡大">＋</button></div>
+  </div>
+
+  <aside class="side">
+    <section class="sec" id="insp"></section>
+    <section class="sec">
+      <h3>チェック<span class="n" id="iss-n"></span></h3>
+      <div id="issues"></div>
+    </section>
+    <section class="sec">
+      <h3>全体</h3>
+      <div class="stats"><div><b id="st-r">0</b><span>部屋</span></div><div><b id="st-b">0</b><span>スペース</span></div><div><b id="st-max">—</b><span>番号の範囲</span></div></div>
+      <p class="muted" style="margin-top:8px" id="st-note"></p>
+      <div class="f" style="margin-top:10px">
+        <label for="m-source">元の図</label><input id="m-source" placeholder="例：大瓜生山祭2026 物販 出店者配置図">
+      </div>
+    </section>
+    <section class="sec">
+      <h3>操作</h3>
+      <dl class="keys">
+        <dt>ドラッグ</dt><dd>選んだものを移動（角の□で大きさ変更）</dd>
+        <dt>Shift+クリック</dt><dd>複数選択に追加・解除</dd>
+        <dt>空いた所をドラッグ</dt><dd>範囲で選択（部屋の中でも）</dd>
+        <dt>部屋</dt><dd>枠線か名前をつかんで移動。Alt+名前で名前だけ移動</dd>
+        <dt>矢印キー</dt><dd>1ずつ移動（Shift で10）</dd>
+        <dt>Ctrl+D</dt><dd>複製</dd>
+        <dt>Delete</dt><dd>削除</dd>
+        <dt>ホイール</dt><dd>拡大・縮小</dd>
+        <dt>スペース+ドラッグ</dt><dd>画面を動かす</dd>
+      </dl>
+    </section>
+  </aside>
+</div>
+
+<div class="dlg" id="d-row" hidden><div>
+  <h2>スペースを並べる</h2>
+  <p>描いた枠を等分して、番号付きのスペースを並べます。</p>
+  <div class="f">
+    <label for="r-n">個数</label><input id="r-n" type="number" min="1" max="60" value="4" class="num">
+    <label for="r-dir">並べ方</label><select id="r-dir"><option value="h">横に並べる</option><option value="v">縦に並べる</option></select>
+    <label for="r-start">最初の番号</label><input id="r-start" class="num">
+    <label for="r-ord">番号の順</label><select id="r-ord"><option value="1">左→右／上→下（増える）</option><option value="-1">右→左／下→上（増える）</option></select>
+  </div>
+  <div class="acts"><button class="btn" data-close>やめる</button><button class="btn pri" id="r-ok">並べる</button></div>
+</div></div>
+
+<div class="dlg prev" id="d-prev" hidden><div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><h2 style="margin:0">サイトでの見え方</h2><span class="muted">物販ナビの地図と同じ立体表示です（色は簡略化）</span><span class="sp"></span><button class="btn small" id="pv-proj">平面</button><button class="btn small" data-close>閉じる</button></div>
+  <svg id="pv" xmlns="http://www.w3.org/2000/svg"></svg>
+  <p class="muted" style="margin-top:8px">部屋の外にあるスペースは、サイトでは見切れることがあります。</p>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const DRAFT = "bn_layout_draft";
+const GRID = 5;
+const NOTION_MAX = 97; // Notion の「照合：番号」の数式で使っている最大番号（数式を書き換えたらここも合わせる）
+
+/* ---------- 状態 ---------- */
+// 部屋 {id,t:"room",name,short,x,y,w,h,lx,ly} / スペース {id,t:"booth",no,x1,x2,y1,y2}
+let doc = { note: "", source: "", rooms: [], booths: [] };
+let loaded = false;
+let sel = new Set();
+let tool = "select", snap = true, nid = 1;
+let bg = null; // {url,w,h,op}
+const V = { s: 1, tx: 0, ty: 0 };
+const hist = [], fut = [];
+
+const newId = () => "i" + nid++;
+const all = () => [...doc.rooms, ...doc.booths];
+const byId = (id) => all().find((o) => o.id === id);
+const box = (o) => o.t === "room" ? { x1: o.x, y1: o.y, x2: o.x + o.w, y2: o.y + o.h } : { x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2 };
+const setBox = (o, b) => {
+  const x1 = Math.min(b.x1, b.x2), x2 = Math.max(b.x1, b.x2), y1 = Math.min(b.y1, b.y2), y2 = Math.max(b.y1, b.y2);
+  if (o.t === "room") { const dx = x1 - o.x, dy = y1 - o.y; if (o.lx != null && (dx || dy) && x2 - x1 === o.w && y2 - y1 === o.h) { o.lx += dx; o.ly += dy; } o.x = x1; o.y = y1; o.w = x2 - x1; o.h = y2 - y1; }
+  else { o.x1 = x1; o.x2 = x2; o.y1 = y1; o.y2 = y2; }
+};
+const sn = (v) => snap ? Math.round(v / GRID) * GRID : Math.round(v);
+const isNum = (v) => typeof v === "number" || /^\d+$/.test(String(v).trim());
+const parseNo = (v) => { const t = String(v).normalize("NFKC").trim(); return /^\d+$/.test(t) ? Number(t) : t; };
+const nextNo = () => { const n = doc.booths.map((b) => b.no).filter((v) => typeof v === "number"); return n.length ? Math.max(...n) + 1 : 1; };
+
+/* ---------- 読み込み・書き出し ---------- */
+function fromJson(j) {
+  if (!j || !Array.isArray(j.rooms) || !Array.isArray(j.booths)) throw new Error("layout.json の形ではありません（rooms と booths が必要）");
+  nid = 1;
+  doc = {
+    note: j.note || "", source: j.source || "",
+    rooms: j.rooms.map((r) => ({ id: newId(), t: "room", name: r.name || "", short: r.short || "", x: +r.x, y: +r.y, w: +r.w, h: +r.h, lx: r.lx ?? null, ly: r.ly ?? null })),
+    booths: j.booths.map((b) => ({ id: newId(), t: "booth", no: b[0], x1: +b[1], x2: +b[2], y1: +b[3], y2: +b[4] })),
+  };
+}
+function toJson() {
+  const R = (v) => Math.round(v);
+  return {
+    note: doc.note || "配置図の座標。単位は配置図の画像ピクセル。部屋は x,y,w,h、スペースは [番号, 左x, 右x, 上y, 下y]。tools/map-editor.html で編集できる。",
+    source: doc.source || "",
+    rooms: doc.rooms.map((r) => { const o = { name: r.name }; if (r.short) o.short = r.short; Object.assign(o, { x: R(r.x), y: R(r.y), w: R(r.w), h: R(r.h) }); if (r.lx != null) { o.lx = R(r.lx); o.ly = R(r.ly); } return o; }),
+    booths: doc.booths.map((b) => [b.no, R(b.x1), R(b.x2), R(b.y1), R(b.y2)]),
+  };
+}
+// 元の layout.json と同じく、スペースは1行に1つの読みやすい形で書き出す
+function jsonText() {
+  const j = toJson();
+  const head = JSON.stringify({ note: j.note, source: j.source, rooms: j.rooms }, null, 1).replace(/\n}$/, "");
+  return head + ',\n "booths": [\n' + j.booths.map((b) => "  " + JSON.stringify(b)).join(",\n") + "\n ]\n}\n";
+}
+
+function openJsonText(text) {
+  try { fromJson(JSON.parse(text)); } catch (e) { toast("開けませんでした：" + e.message); return; }
+  hist.length = fut.length = 0; sel.clear(); loaded = true; $("#m-source").value = doc.source; lastSnap = snapshot();
+  render(); fit(); save(); toast(`部屋 ${doc.rooms.length}・スペース ${doc.booths.length} を読み込みました`);
+}
+function openImage(file) {
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    bg = { url, w: im.naturalWidth, h: im.naturalHeight, op: +$("#op").value / 100 };
+    $("#op-wrap").hidden = false;
+    if (!loaded) { doc = { note: "", source: "", rooms: [], booths: [] }; loaded = true; hist.length = fut.length = 0; lastSnap = snapshot(); setTool("room"); toast("下絵の上に、まず部屋を描いてください"); }
+    else toast("下絵を読み込みました");
+    render(); fit();
+  };
+  im.onerror = () => toast("画像を読み込めませんでした");
+  im.src = url;
+}
+function readFile(f) {
+  if (!f) return;
+  if (/^image\//.test(f.type)) return openImage(f);
+  if (/\.json$/i.test(f.name) || f.type === "application/json") { const r = new FileReader(); r.onload = () => openJsonText(r.result); r.readAsText(f); return; }
+  if (/pdf/i.test(f.type)) return toast("PDF はそのまま開けません。画像（PNG / JPG）に書き出してから読み込んでください");
+  toast("layout.json か画像を選んでください");
+}
+function download() {
+  const blob = new Blob([jsonText()], { type: "application/json" }), a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "layout.json"; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  const bad = issues().filter((i) => i.lv === "bad").length;
+  toast(bad ? `書き出しました（要確認が ${bad} 件あります）` : "書き出しました。data/layout.json に上書きして push してください");
+}
+async function copyText() {
+  try { await navigator.clipboard.writeText(jsonText()); toast("コピーしました"); }
+  catch { toast("コピーできませんでした。「書き出す」を使ってください"); }
+}
+
+/* ---------- 履歴・下書き ---------- */
+const snapshot = () => JSON.stringify({ doc, nid });
+function commit() { hist.push(lastSnap); if (hist.length > 150) hist.shift(); fut.length = 0; lastSnap = snapshot(); save(); }
+let lastSnap = snapshot();
+function restore(s) { const o = JSON.parse(s); doc = o.doc; nid = o.nid; sel = new Set([...sel].filter((id) => byId(id))); lastSnap = s; render(); save(); }
+function undo() { if (!hist.length) return; fut.push(snapshot()); restore(hist.pop()); }
+function redo() { if (!fut.length) return; hist.push(snapshot()); restore(fut.pop()); }
+let saveT;
+function save() { clearTimeout(saveT); saveT = setTimeout(() => store.set(DRAFT, JSON.stringify({ at: Date.now(), json: toJson() })), 300); }
+
+/* ---------- 表示 ---------- */
+const stage = $("#stage"), vp = $("#vp");
+function applyView() { vp.setAttribute("transform", `translate(${V.tx},${V.ty}) scale(${V.s})`); document.querySelectorAll(".g-room .hit").forEach((h) => h.setAttribute("stroke-width", (10 / V.s).toFixed(2))); drawGrid(); drawOverlay(); }
+function bounds() {
+  let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+  all().forEach((o) => { const b = box(o); x1 = Math.min(x1, b.x1); y1 = Math.min(y1, b.y1); x2 = Math.max(x2, b.x2); y2 = Math.max(y2, b.y2); });
+  if (bg) { x1 = Math.min(x1, 0); y1 = Math.min(y1, 0); x2 = Math.max(x2, bg.w); y2 = Math.max(y2, bg.h); }
+  return x1 > x2 ? { x1: 0, y1: 0, x2: 1000, y2: 700 } : { x1, y1, x2, y2 };
+}
+function fit() {
+  const b = bounds(), r = stage.getBoundingClientRect(), pad = 40;
+  V.s = Math.min((r.width - pad * 2) / (b.x2 - b.x1), (r.height - pad * 2) / (b.y2 - b.y1));
+  V.tx = (r.width - (b.x2 - b.x1) * V.s) / 2 - b.x1 * V.s; V.ty = (r.height - (b.y2 - b.y1) * V.s) / 2 - b.y1 * V.s;
+  applyView();
+}
+function zoomAt(f, px, py) {
+  const ns = Math.min(20, Math.max(.05, V.s * f)); f = ns / V.s;
+  V.tx = px - (px - V.tx) * f; V.ty = py - (py - V.ty) * f; V.s = ns; applyView();
+}
+const toW = (e) => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left - V.tx) / V.s, y: (e.clientY - r.top - V.ty) / V.s }; };
+
+function drawGrid() {
+  const g = $("#gridl"); g.innerHTML = "";
+  if (!snap || V.s < 1.6) return;
+  const r = stage.getBoundingClientRect(), x0 = -V.tx / V.s, y0 = -V.ty / V.s, x1 = x0 + r.width / V.s, y1 = y0 + r.height / V.s;
+  const step = GRID * (V.s < 3 ? 2 : 1); let h = "";
+  for (let x = Math.floor(x0 / step) * step; x < x1; x += step) h += `<line x1="${x}" y1="${y0}" x2="${x}" y2="${y1}" opacity=".5"/>`;
+  for (let y = Math.floor(y0 / step) * step; y < y1; y += step) h += `<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" opacity=".5"/>`;
+  g.innerHTML = h;
+}
+
+let issueIds = new Set();
+function render() {
+  $("#empty").hidden = loaded; stage.classList.toggle("hasbg", !!bg);
+  $("#bgl").innerHTML = bg ? `<image href="${bg.url}" x="0" y="0" width="${bg.w}" height="${bg.h}" opacity="${bg.op}" preserveAspectRatio="none"/>` : "";
+  const iss = issues(); issueIds = new Set(iss.filter((i) => i.lv === "bad").flatMap((i) => i.ids));
+  $("#rooml").innerHTML = doc.rooms.map((r) => {
+    const tx = r.lx ?? r.x + r.w / 2, ty = r.ly ?? r.y + r.h / 2;
+    return `<g class="g-room${sel.has(r.id) ? " sel" : ""}" data-id="${r.id}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/><rect class="hit" stroke-width="${(10 / V.s).toFixed(2)}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/><text x="${tx}" y="${ty}" text-anchor="middle" font-size="${r.short ? 15 : 18}">${esc(r.name || "（名前なし）")}</text></g>`;
+  }).join("");
+  $("#boothl").innerHTML = doc.booths.map((b) => {
+    const w = b.x2 - b.x1, h = b.y2 - b.y1, fs = Math.min(13, Math.max(7, Math.min(w, h) * .55));
+    const cls = "g-booth" + (sel.has(b.id) ? " sel" : "") + (isNum(b.no) ? "" : " recept") + (issueIds.has(b.id) ? " bad" : "");
+    return `<g class="${cls}" data-id="${b.id}"><rect x="${b.x1}" y="${b.y1}" width="${w}" height="${h}"/><text x="${b.x1 + w / 2}" y="${b.y1 + h / 2}" text-anchor="middle" font-size="${fs.toFixed(1)}">${esc(b.no)}</text></g>`;
+  }).join("");
+  drawOverlay(); renderSide(iss);
+  $("#b-undo").disabled = !hist.length; $("#b-redo").disabled = !fut.length;
+}
+let ghost = null, marquee = null;
+function drawOverlay() {
+  let h = "";
+  const k = 1 / V.s;
+  if (sel.size === 1) {
+    const o = byId([...sel][0]);
+    if (o) { const b = box(o), r = 4.5 * k; [[b.x1, b.y1], [b.x2, b.y1], [b.x1, b.y2], [b.x2, b.y2]].forEach(([x, y], i) => h += `<rect class="handle" data-h="${i}" x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}" style="cursor:${i === 0 || i === 3 ? "nwse" : "nesw"}-resize"/>`); }
+  }
+  if (marquee) h += `<rect class="marquee" x="${Math.min(marquee.x1, marquee.x2)}" y="${Math.min(marquee.y1, marquee.y2)}" width="${Math.abs(marquee.x2 - marquee.x1)}" height="${Math.abs(marquee.y2 - marquee.y1)}"/>`;
+  if (ghost) {
+    const x = Math.min(ghost.x1, ghost.x2), y = Math.min(ghost.y1, ghost.y2), w = Math.abs(ghost.x2 - ghost.x1), hh = Math.abs(ghost.y2 - ghost.y1);
+    h += `<rect class="ghost" x="${x}" y="${y}" width="${w}" height="${hh}"/>`;
+    h += `<text x="${x + w / 2}" y="${y - 6 * k}" text-anchor="middle" font-size="${12 * k}" fill="var(--accent)" font-family="Barlow">${Math.round(w)} × ${Math.round(hh)}</text>`;
+  }
+  $("#ovl").innerHTML = h;
+}
+
+/* ---------- 右パネル ---------- */
+function renderSide(iss) {
+  const items = [...sel].map(byId).filter(Boolean), insp = $("#insp");
+  if (!loaded) insp.innerHTML = `<h3>選んだもの</h3><p class="muted">まだ配置図を開いていません。</p>`;
+  else if (!items.length) insp.innerHTML = `<h3>選んだもの</h3><p class="muted">部屋やスペースを押すと、ここで名前・番号・位置を直せます。</p>
+    <div class="acts"><button class="btn small" data-act="selall-b">スペースを全部選ぶ</button></div>`;
+  else if (items.length === 1) {
+    const o = items[0], b = box(o);
+    if (o.t === "booth") insp.innerHTML = `<h3>スペース</h3>
+      <div class="f"><label for="i-no">番号</label><input id="i-no" class="num" value="${esc(o.no)}" placeholder="例：12 / 受付"></div>
+      <p class="muted" style="margin:6px 0 10px">数字以外（「受付」など）は押せない目印として表示されます。</p>
+      ${xyFields(b)}
+      <div class="acts"><button class="btn small" data-act="dup">複製</button><button class="btn small" data-act="del">削除</button></div>`;
+    else insp.innerHTML = `<h3>部屋</h3>
+      <div class="f"><label for="i-name">名前</label><input id="i-name" value="${esc(o.name)}" placeholder="例：NA410">
+      <label for="i-short">短い名前</label><input id="i-short" value="${esc(o.short)}" placeholder="一覧に出す略称（任意）"></div>
+      <div style="margin-top:10px">${xyFields(b)}</div>
+      <div class="acts"><button class="btn small" data-act="label-reset" ${o.lx == null ? "disabled" : ""}>名前の位置を中央に</button><button class="btn small" data-act="del">削除</button></div>
+      <p class="muted" style="margin-top:8px">名前の位置は、名前の文字を Alt を押しながらドラッグすると動かせます。</p>`;
+  } else {
+    const nb = items.filter((o) => o.t === "booth").length;
+    insp.innerHTML = `<h3>${items.length} 個を選択中<span class="n">スペース ${nb}</span></h3>
+      ${nb ? `<div class="f"><label for="m-start">連番</label><div style="display:flex;gap:6px"><input id="m-start" class="num" value="${nextFree()}" style="width:70px"><select id="m-ord"><option value="lr">左→右</option><option value="rl">右→左</option><option value="tb">上→下</option><option value="bt">下→上</option></select></div></div>
+      <div class="acts"><button class="btn small" data-act="renum">この順で番号を振る</button></div>` : ""}
+      <h3 style="margin-top:14px">そろえる</h3>
+      <div class="acts" style="margin-top:0"><button class="btn small" data-act="al-top">上端</button><button class="btn small" data-act="al-bottom">下端</button><button class="btn small" data-act="al-left">左端</button><button class="btn small" data-act="al-right">右端</button><button class="btn small" data-act="al-size">大きさ</button></div>
+      <p class="muted" style="margin-top:6px">「大きさ」は最初に選んだものに合わせます。</p>
+      <div class="acts"><button class="btn small" data-act="dup">複製</button><button class="btn small" data-act="del">削除</button></div>`;
+  }
+  // チェック
+  $("#iss-n").textContent = iss.length ? iss.length + " 件" : "";
+  $("#issues").innerHTML = !loaded ? `<p class="muted">—</p>` : iss.length
+    ? `<ul class="issues">${iss.slice(0, 60).map((i, k) => `<li class="${i.lv}" data-iss="${k}"><i>${i.lv === "bad" ? "●" : "▲"}</i><span>${esc(i.msg)}</span></li>`).join("")}</ul>`
+    : `<p class="okline">✓ 問題は見つかりませんでした</p>`;
+  window.__iss = iss;
+  // 全体
+  const nums = doc.booths.map((b) => b.no).filter((v) => typeof v === "number");
+  $("#st-r").textContent = doc.rooms.length; $("#st-b").textContent = doc.booths.filter((b) => isNum(b.no)).length;
+  $("#st-max").textContent = nums.length ? `${Math.min(...nums)}〜${Math.max(...nums)}` : "—";
+  const mx = nums.length ? Math.max(...nums) : 0;
+  $("#st-note").innerHTML = !mx ? "" : mx === NOTION_MAX ? `Notion の「照合：番号」の数式（1〜${NOTION_MAX}）と合っています。`
+    : `⚠ 番号の最大が <b class="num">${mx}</b> になりました。Notion の「照合：番号」の数式の <b class="num">${NOTION_MAX}</b> を <b class="num">${mx}</b> に書き換えてください。`;
+}
+function xyFields(b) {
+  const f = (k, l, v) => `<div><label for="i-${k}">${l}</label><input id="i-${k}" type="number" value="${Math.round(v)}"></div>`;
+  return `<div class="f4">${f("x1", "左", b.x1)}${f("y1", "上", b.y1)}${f("w", "幅", b.x2 - b.x1)}${f("h", "高さ", b.y2 - b.y1)}</div>`;
+}
+const nextFree = () => { const items = [...sel].map(byId).filter((o) => o && o.t === "booth"); const n = items.map((b) => b.no).filter((v) => typeof v === "number"); return n.length ? Math.min(...n) : nextNo(); };
+
+/* ---------- チェック ---------- */
+function issues() {
+  const out = [], seen = new Map();
+  doc.booths.forEach((b) => {
+    const k = String(b.no).trim();
+    if (!k) out.push({ lv: "bad", msg: "番号が空のスペースがあります", ids: [b.id] });
+    else if (seen.has(k)) out.push({ lv: "bad", msg: `番号 ${k} が重複しています`, ids: [seen.get(k), b.id] });
+    else seen.set(k, b.id);
+    if (b.x2 - b.x1 < 4 || b.y2 - b.y1 < 4) out.push({ lv: "warn", msg: `スペース ${k || "?"} が小さすぎます`, ids: [b.id] });
+    const cx = (b.x1 + b.x2) / 2, cy = (b.y1 + b.y2) / 2;
+    if (doc.rooms.length && !doc.rooms.some((r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h))
+      out.push({ lv: "warn", msg: `スペース ${k || "?"} がどの部屋にも入っていません（部屋名が出ません）`, ids: [b.id] });
+  });
+  for (let i = 0; i < doc.booths.length; i++) for (let j = i + 1; j < doc.booths.length; j++) {
+    const a = doc.booths[i], c = doc.booths[j];
+    const ox = Math.min(a.x2, c.x2) - Math.max(a.x1, c.x1), oy = Math.min(a.y2, c.y2) - Math.max(a.y1, c.y1);
+    if (ox > 1.5 && oy > 1.5) out.push({ lv: "warn", msg: `スペース ${a.no} と ${c.no} が重なっています`, ids: [a.id, c.id] });
+  }
+  doc.rooms.forEach((r) => { if (!String(r.name).trim()) out.push({ lv: "bad", msg: "名前のない部屋があります", ids: [r.id] }); });
+  const nums = doc.booths.map((b) => b.no).filter((v) => typeof v === "number");
+  if (nums.length) {
+    const have = new Set(nums), miss = [];
+    for (let n = 1; n <= Math.max(...nums); n++) if (!have.has(n)) miss.push(n);
+    if (miss.length) out.push({ lv: "warn", msg: `抜けている番号：${miss.slice(0, 15).join("、")}${miss.length > 15 ? ` ほか${miss.length - 15}件` : ""}`, ids: [] });
+  }
+  return out;
+}
+
+/* ---------- 編集の操作 ---------- */
+function setTool(t) {
+  tool = t; document.querySelectorAll(".tool[data-tool]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tool === t));
+  stage.classList.toggle("draw", t === "room" || t === "booth" || t === "row"); stage.classList.toggle("pan", t === "pan");
+  $("#hint").textContent = { select: "押して選ぶ・ドラッグで移動。部屋は枠線か名前をつかむ。空いた所をドラッグすると範囲選択", room: "ドラッグして部屋を描く", booth: `ドラッグしてスペースを描く（次の番号：${nextNo()}）`, row: "ドラッグした枠を等分して、スペースを並べる", pan: "ドラッグで画面を動かす" }[t];
+}
+function del() { if (!sel.size) return; doc.rooms = doc.rooms.filter((o) => !sel.has(o.id)); doc.booths = doc.booths.filter((o) => !sel.has(o.id)); sel.clear(); commit(); render(); }
+function dup() {
+  const items = [...sel].map(byId).filter(Boolean); if (!items.length) return;
+  let n = nextNo(); const off = 10; sel.clear();
+  items.forEach((o) => { const c = structuredClone(o); c.id = newId(); const b = box(o); setBox(c, { x1: b.x1 + off, y1: b.y1 + off, x2: b.x2 + off, y2: b.y2 + off });
+    if (c.t === "booth") { if (typeof c.no === "number") c.no = n++; doc.booths.push(c); } else { c.name += "（コピー）"; if (c.lx != null) { c.lx += off; c.ly += off; } doc.rooms.push(c); } sel.add(c.id); });
+  commit(); render();
+}
+function nudge(dx, dy) { [...sel].map(byId).forEach((o) => { const b = box(o); setBox(o, { x1: b.x1 + dx, y1: b.y1 + dy, x2: b.x2 + dx, y2: b.y2 + dy }); if (o.t === "room" && o.lx != null) { o.lx += dx; o.ly += dy; } }); commit(); render(); }
+function renumber() {
+  const start = parseNo($("#m-start").value), ord = $("#m-ord").value;
+  if (typeof start !== "number") return toast("最初の番号は数字で入れてください");
+  const items = [...sel].map(byId).filter((o) => o && o.t === "booth");
+  const c = (o) => ({ x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 });
+  const key = { lr: (a, b) => c(a).x - c(b).x || c(a).y - c(b).y, rl: (a, b) => c(b).x - c(a).x || c(a).y - c(b).y, tb: (a, b) => c(a).y - c(b).y || c(a).x - c(b).x, bt: (a, b) => c(b).y - c(a).y || c(a).x - c(b).x }[ord];
+  items.sort(key).forEach((o, i) => (o.no = start + i));
+  commit(); render(); toast(`${start}〜${start + items.length - 1} を振りました`);
+}
+function align(kind) {
+  const items = [...sel].map(byId).filter(Boolean); if (items.length < 2) return;
+  const bs = items.map(box);
+  const v = { top: Math.min(...bs.map((b) => b.y1)), bottom: Math.max(...bs.map((b) => b.y2)), left: Math.min(...bs.map((b) => b.x1)), right: Math.max(...bs.map((b) => b.x2)) }[kind];
+  const first = box(items[0]), fw = first.x2 - first.x1, fh = first.y2 - first.y1;
+  items.forEach((o, i) => { const b = bs[i], w = b.x2 - b.x1, h = b.y2 - b.y1; let n = { ...b };
+    if (kind === "top") n = { ...b, y1: v, y2: v + h }; if (kind === "bottom") n = { ...b, y1: v - h, y2: v };
+    if (kind === "left") n = { ...b, x1: v, x2: v + w }; if (kind === "right") n = { ...b, x1: v - w, x2: v };
+    if (kind === "size") n = { ...b, x2: b.x1 + fw, y2: b.y1 + fh };
+    setBox(o, n); });
+  commit(); render();
+}
+
+/* 並べて描く */
+let rowBox = null;
+function openRow(b) {
+  rowBox = b; const w = b.x2 - b.x1, h = b.y2 - b.y1;
+  $("#r-dir").value = w >= h ? "h" : "v";
+  const guess = Math.max(1, Math.round((w >= h ? w : h) / (w >= h ? 65 : 54)));
+  $("#r-n").value = Math.min(20, guess); $("#r-start").value = nextNo();
+  $("#d-row").hidden = false; setTimeout(() => $("#r-n").select(), 30);
+}
+function applyRow() {
+  const n = Math.max(1, Math.min(60, parseInt($("#r-n").value, 10) || 1)), dir = $("#r-dir").value, ord = +$("#r-ord").value;
+  let start = parseNo($("#r-start").value); if (typeof start !== "number") return toast("最初の番号は数字で入れてください");
+  const b = rowBox, list = []; sel.clear();
+  for (let i = 0; i < n; i++) {
+    const k = ord === 1 ? i : n - 1 - i;
+    const o = dir === "h"
+      ? { x1: b.x1 + (b.x2 - b.x1) * k / n, x2: b.x1 + (b.x2 - b.x1) * (k + 1) / n, y1: b.y1, y2: b.y2 }
+      : { x1: b.x1, x2: b.x2, y1: b.y1 + (b.y2 - b.y1) * k / n, y2: b.y1 + (b.y2 - b.y1) * (k + 1) / n };
+    const R = (v) => Math.round(v * 10) / 10;
+    const bo = { id: newId(), t: "booth", no: start + i, x1: R(o.x1), x2: R(o.x2), y1: R(o.y1), y2: R(o.y2) };
+    doc.booths.push(bo); sel.add(bo.id); list.push(bo);
+  }
+  $("#d-row").hidden = true; commit(); render(); setTool("row");
+  toast(`スペース ${start}〜${start + n - 1} を並べました`);
+}
+
+/* ---------- マウス操作 ---------- */
+let drag = null, spaceDown = false;
+stage.addEventListener("pointerdown", (e) => {
+  if (!loaded) return;
+  stage.setPointerCapture(e.pointerId);
+  const p = toW(e), t = e.target;
+  if (e.button === 1 || e.button === 2 || tool === "pan" || spaceDown) { drag = { kind: "pan", sx: e.clientX, sy: e.clientY, tx: V.tx, ty: V.ty }; stage.classList.add("panning"); return; }
+  if (tool === "room" || tool === "booth" || tool === "row") { const x = sn(p.x), y = sn(p.y); ghost = { x1: x, y1: y, x2: x, y2: y }; drag = { kind: "draw" }; drawOverlay(); return; }
+  // 選択
+  if (t.classList.contains("handle")) { const o = byId([...sel][0]); drag = { kind: "resize", o, h: +t.dataset.h, b0: box(o) }; return; }
+  const g = t.closest("[data-id]");
+  if (g) {
+    const id = g.dataset.id, o = byId(id);
+    if (e.altKey && o.t === "room" && t.tagName === "text") { drag = { kind: "label", o }; return; }
+    if (e.shiftKey) { sel.has(id) ? sel.delete(id) : sel.add(id); render(); return; }
+    if (!sel.has(id)) { sel = new Set([id]); render(); }
+    drag = { kind: "move", p0: p, items: [...sel].map(byId).map((o) => ({ o, b: box(o), lx: o.lx, ly: o.ly })), moved: false };
+    return;
+  }
+  if (!e.shiftKey) sel.clear();
+  marquee = { x1: p.x, y1: p.y, x2: p.x, y2: p.y, add: e.shiftKey, base: new Set(sel) }; drag = { kind: "marquee" }; render();
+});
+stage.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const p = toW(e);
+  if (drag.kind === "pan") { V.tx = drag.tx + e.clientX - drag.sx; V.ty = drag.ty + e.clientY - drag.sy; applyView(); return; }
+  if (drag.kind === "draw") { ghost.x2 = sn(p.x); ghost.y2 = sn(p.y); drawOverlay(); return; }
+  if (drag.kind === "move") {
+    let dx = p.x - drag.p0.x, dy = p.y - drag.p0.y;
+    if (!drag.moved && Math.hypot(dx, dy) * V.s < 3) return; drag.moved = true;
+    if (snap) { const b = drag.items[0].b; dx = sn(b.x1 + dx) - b.x1; dy = sn(b.y1 + dy) - b.y1; } else { dx = Math.round(dx); dy = Math.round(dy); }
+    drag.items.forEach(({ o, b, lx, ly }) => { setBox(o, { x1: b.x1 + dx, y1: b.y1 + dy, x2: b.x2 + dx, y2: b.y2 + dy }); if (o.t === "room" && lx != null) { o.lx = lx + dx; o.ly = ly + dy; } });
+    render(); return;
+  }
+  if (drag.kind === "resize") {
+    const b = { ...drag.b0 }, x = sn(p.x), y = sn(p.y);
+    if (drag.h === 0 || drag.h === 2) b.x1 = x; else b.x2 = x;
+    if (drag.h === 0 || drag.h === 1) b.y1 = y; else b.y2 = y;
+    setBox(drag.o, b); render(); return;
+  }
+  if (drag.kind === "label") { drag.o.lx = Math.round(p.x); drag.o.ly = Math.round(p.y); render(); return; }
+  if (drag.kind === "marquee") {
+    marquee.x2 = p.x; marquee.y2 = p.y;
+    const m = { x1: Math.min(marquee.x1, marquee.x2), x2: Math.max(marquee.x1, marquee.x2), y1: Math.min(marquee.y1, marquee.y2), y2: Math.max(marquee.y1, marquee.y2) };
+    sel = new Set(marquee.base);
+    // スペースを優先して選ぶ。スペースが1つも入らないときだけ部屋を選ぶ
+    const inside = (o) => { const b = box(o); return b.x1 >= m.x1 && b.x2 <= m.x2 && b.y1 >= m.y1 && b.y2 <= m.y2; };
+    const bs = doc.booths.filter(inside); (bs.length ? bs : doc.rooms.filter(inside)).forEach((o) => sel.add(o.id));
+    render();
+  }
+});
+stage.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const k = drag.kind; stage.classList.remove("panning");
+  if (k === "draw") {
+    const g = ghost; ghost = null;
+    const b = { x1: Math.min(g.x1, g.x2), x2: Math.max(g.x1, g.x2), y1: Math.min(g.y1, g.y2), y2: Math.max(g.y1, g.y2) };
+    if (b.x2 - b.x1 < 4 || b.y2 - b.y1 < 4) { drag = null; drawOverlay(); return; }
+    if (tool === "room") { const r = { id: newId(), t: "room", name: "", short: "", x: b.x1, y: b.y1, w: b.x2 - b.x1, h: b.y2 - b.y1, lx: null, ly: null }; doc.rooms.push(r); sel = new Set([r.id]); commit(); render(); setTool("select"); setTimeout(() => $("#i-name")?.focus(), 20); }
+    else if (tool === "booth") { const o = { id: newId(), t: "booth", no: nextNo(), ...b }; doc.booths.push(o); sel = new Set([o.id]); commit(); render(); setTool("booth"); }
+    else { drag = null; drawOverlay(); openRow(b); return; }
+  }
+  if (k === "move" && drag.moved) commit();
+  if (k === "resize" || k === "label") commit();
+  if (k === "marquee") { marquee = null; render(); }
+  drag = null;
+});
+stage.addEventListener("contextmenu", (e) => e.preventDefault());
+stage.addEventListener("wheel", (e) => { e.preventDefault(); const r = stage.getBoundingClientRect();
+  if (e.ctrlKey || (!e.shiftKey && !e.deltaX)) zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .0015)), e.clientX - r.left, e.clientY - r.top);
+  else { if (e.shiftKey && !e.deltaX) V.tx -= e.deltaY; else { V.tx -= e.deltaX; V.ty -= e.deltaY; } applyView(); } }, { passive: false });
+new ResizeObserver(() => applyView()).observe(stage);
+
+/* ---------- 右パネルの入力 ---------- */
+$("#insp").addEventListener("change", (e) => {
+  const o = byId([...sel][0]); if (!o || sel.size !== 1) return;
+  const id = e.target.id, v = e.target.value;
+  if (id === "i-no") o.no = parseNo(v);
+  else if (id === "i-name") o.name = v.trim();
+  else if (id === "i-short") o.short = v.trim();
+  else if (/^i-(x1|y1|w|h)$/.test(id)) {
+    const b = box(o), n = Number(v); if (!isFinite(n)) return;
+    if (id === "i-x1") setBox(o, { ...b, x1: n, x2: n + b.x2 - b.x1 }); if (id === "i-y1") setBox(o, { ...b, y1: n, y2: n + b.y2 - b.y1 });
+    if (id === "i-w" && n > 0) setBox(o, { ...b, x2: b.x1 + n }); if (id === "i-h" && n > 0) setBox(o, { ...b, y2: b.y1 + n });
+  } else return;
+  commit(); render();
+});
+$("#insp").addEventListener("click", (e) => {
+  const a = e.target.closest("[data-act]")?.dataset.act; if (!a) return;
+  if (a === "del") del(); if (a === "dup") dup(); if (a === "renum") renumber();
+  if (a === "selall-b") { sel = new Set(doc.booths.map((b) => b.id)); render(); }
+  if (a === "label-reset") { const o = byId([...sel][0]); o.lx = o.ly = null; commit(); render(); }
+  if (a.startsWith("al-")) align(a.slice(3));
+});
+$("#issues").addEventListener("click", (e) => {
+  const li = e.target.closest("[data-iss]"); if (!li) return; const it = window.__iss[+li.dataset.iss]; if (!it.ids.length) return;
+  sel = new Set(it.ids); render();
+  const b = box(byId(it.ids[0])), r = stage.getBoundingClientRect(); V.s = Math.max(V.s, 2.5);
+  V.tx = r.width / 2 - (b.x1 + b.x2) / 2 * V.s; V.ty = r.height / 2 - (b.y1 + b.y2) / 2 * V.s; applyView();
+});
+$("#m-source").addEventListener("change", (e) => { doc.source = e.target.value.trim(); commit(); });
+
+/* ---------- 立体プレビュー（サイトの地図と同じ投影） ---------- */
+let pvIso = true;
+function renderPreview() {
+  const th = -26 * Math.PI / 180, k = .58, c = Math.cos(th), s = Math.sin(th);
+  const P = pvIso ? (x, y, z = 0) => [x * c - y * s, (x * s + y * c) * k - z] : (x, y) => [x, y];
+  const Z = pvIso ? 9 : 0, WALL = pvIso ? 14 : 0;
+  const pts = (a) => a.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+  const quad = (x1, y1, x2, y2, z) => [P(x1, y1, z), P(x2, y1, z), P(x2, y2, z), P(x1, y2, z)];
+  let mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9, out = "";
+  const src = doc.rooms.length ? doc.rooms.map((r) => ({ x1: r.x, y1: r.y, x2: r.x + r.w, y2: r.y + r.h })) : doc.booths;
+  src.forEach((r) => [[r.x1, r.y1], [r.x2, r.y1], [r.x1, r.y2], [r.x2, r.y2]].forEach(([x, y]) => [0, WALL].forEach((z) => { const [a, b] = P(x, y, z); mnx = Math.min(mnx, a); mxx = Math.max(mxx, a); mny = Math.min(mny, b); mxy = Math.max(mxy, b); })));
+  const pad = 40;
+  doc.rooms.forEach((r) => (out += `<polygon class="pv-floor" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
+  doc.booths.slice().sort((a, b) => P((a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2)[1] - P((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)[1]).forEach((b) => {
+    if (pvIso) out += `<polygon class="pv-s1" points="${pts([P(b.x1, b.y2, 0), P(b.x2, b.y2, 0), P(b.x2, b.y2, Z), P(b.x1, b.y2, Z)])}"/><polygon class="pv-s2" points="${pts([P(b.x1, b.y1, 0), P(b.x1, b.y2, 0), P(b.x1, b.y2, Z), P(b.x1, b.y1, Z)])}"/>`;
+    out += `<polygon class="pv-t" points="${pts(quad(b.x1, b.y1, b.x2, b.y2, Z))}"/>`;
+    const [cx, cy] = P((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2, Z), fs = Math.min(13, Math.max(9, Math.min(b.x2 - b.x1, b.y2 - b.y1) * .55));
+    out += `<text class="pv-txt" x="${cx.toFixed(1)}" y="${(cy + fs * .36).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle">${esc(b.no)}</text>`;
+  });
+  doc.rooms.forEach((r) => {
+    const a = [r.x, r.y], b = [r.x + r.w, r.y], d = [r.x, r.y + r.h];
+    if (pvIso) { const up = (p) => P(p[0], p[1], WALL), dn = (p) => P(p[0], p[1], 0); out += `<polyline class="pv-wall" points="${pts([up(d), up(a), up(b)])}"/>` + [a, b, d].map((p) => `<line class="pv-wall" x1="${dn(p)[0]}" y1="${dn(p)[1]}" x2="${up(p)[0]}" y2="${up(p)[1]}"/>`).join(""); }
+    const [tx, ty] = P(r.lx ?? r.x + r.w / 2, r.ly ?? r.y + r.h / 2, 0);
+    out += `<text class="pv-label" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-size="${r.short ? 15 : 20}" text-anchor="middle">${esc(r.name)}</text>`;
+  });
+  const sv = $("#pv"); sv.setAttribute("viewBox", `${mnx - pad} ${mny - pad} ${mxx - mnx + pad * 2} ${mxy - mny + pad * 2}`); sv.innerHTML = out;
+  $("#pv-proj").textContent = pvIso ? "平面" : "立体";
+}
+
+/* ---------- ボタン・キーボード ---------- */
+const toastEl = $("#toast"); let toastT;
+function toast(m) { toastEl.textContent = m; toastEl.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("on"), 2600); }
+$("#b-open").onclick = $("#e-open").onclick = () => $("#f-json").click();
+$("#b-bg").onclick = $("#e-bg").onclick = () => $("#f-img").click();
+$("#f-json").onchange = (e) => { readFile(e.target.files[0]); e.target.value = ""; };
+$("#f-img").onchange = (e) => { readFile(e.target.files[0]); e.target.value = ""; };
+$("#op").oninput = (e) => { if (bg) { bg.op = e.target.value / 100; $("#bgl image")?.setAttribute("opacity", bg.op); } };
+$("#b-save").onclick = () => loaded ? download() : toast("まだ何も開いていません");
+$("#b-copy").onclick = () => loaded ? copyText() : toast("まだ何も開いていません");
+$("#b-undo").onclick = undo; $("#b-redo").onclick = redo;
+$("#b-prev").onclick = () => { if (!loaded) return toast("まだ何も開いていません"); $("#d-prev").hidden = false; renderPreview(); };
+$("#pv-proj").onclick = () => { pvIso = !pvIso; renderPreview(); };
+$("#r-ok").onclick = applyRow;
+document.querySelectorAll(".dlg").forEach((d) => d.addEventListener("click", (e) => { if (e.target === d || e.target.closest("[data-close]")) d.hidden = true; }));
+$("#z-in").onclick = () => { const r = stage.getBoundingClientRect(); zoomAt(1.3, r.width / 2, r.height / 2); };
+$("#z-out").onclick = () => { const r = stage.getBoundingClientRect(); zoomAt(1 / 1.3, r.width / 2, r.height / 2); };
+$("#z-fit").onclick = fit;
+document.querySelectorAll(".tool[data-tool]").forEach((b) => (b.onclick = () => setTool(b.dataset.tool)));
+$("#t-grid").onclick = () => { snap = !snap; $("#t-grid").setAttribute("aria-pressed", snap); drawGrid(); };
+$("#d-row").addEventListener("keydown", (e) => { if (e.key === "Enter") applyRow(); });
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { document.querySelectorAll(".dlg").forEach((d) => (d.hidden = true)); ghost = marquee = null; sel.clear(); render(); return; }
+  if (e.target.closest("input,select,textarea") || !$("#d-row").hidden) return;
+  const c = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (e.code === "Space") { if (!spaceDown) { spaceDown = true; stage.classList.add("pan"); } e.preventDefault(); return; }
+  if (c && k === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (c && k === "y") { e.preventDefault(); redo(); return; }
+  if (c && k === "d") { e.preventDefault(); dup(); return; }
+  if (c && k === "a") { e.preventDefault(); sel = new Set(doc.booths.map((b) => b.id)); render(); return; }
+  if (c && k === "s") { e.preventDefault(); if (loaded) download(); return; }
+  if (c) return;
+  if (k === "delete" || k === "backspace") { e.preventDefault(); del(); return; }
+  const step = e.shiftKey ? 10 : 1;
+  if (sel.size && e.key.startsWith("Arrow")) { e.preventDefault(); nudge(e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0, e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0); return; }
+  const tk = { v: "select", r: "room", b: "booth", s: "row", h: "pan" }[k]; if (tk && loaded) { setTool(tk); return; }
+  if (k === "g") $("#t-grid").click();
+  if (k === "f") fit();
+});
+document.addEventListener("keyup", (e) => { if (e.code === "Space") { spaceDown = false; stage.classList.toggle("pan", tool === "pan"); } });
+
+// ファイルのドラッグ＆ドロップ
+const wrap = $("#wrap");
+["dragenter", "dragover"].forEach((t) => wrap.addEventListener(t, (e) => { e.preventDefault(); wrap.classList.add("drop"); }));
+["dragleave", "drop"].forEach((t) => wrap.addEventListener(t, (e) => { e.preventDefault(); wrap.classList.remove("drop"); }));
+wrap.addEventListener("drop", (e) => [...e.dataTransfer.files].sort((a) => (/^image\//.test(a.type) ? 1 : -1)).forEach(readFile));
+
+// 書き出していない変更があるときは閉じる前に確認
+window.addEventListener("beforeunload", (e) => { if (hist.length) { e.preventDefault(); e.returnValue = ""; } });
+
+// 前回の下書き
+(() => { const d = store.get(DRAFT); if (!d) return; try { const o = JSON.parse(d); if (!o.json?.booths) return;
+  const when = new Date(o.at); $("#e-draft").hidden = false;
+  $("#e-restore").textContent = `前回の作業の続きから（${when.getMonth() + 1}/${when.getDate()} ${String(when.getHours()).padStart(2, "0")}:${String(when.getMinutes()).padStart(2, "0")}）`;
+  $("#e-restore").onclick = () => openJsonText(JSON.stringify(o.json)); } catch {} })();
+
+setTool("select"); render();
+</script>
+</body>
+</html>

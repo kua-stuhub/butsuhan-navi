@@ -246,6 +246,11 @@ if (other) other.tags.push(...extra);
 const seen = new Map();
 for (const e of exhibitors) { if (!e.space) warn(`「${e.name}」のスペース番号が空です`); else if (seen.has(e.space)) warn(`スペース ${e.space} が重複: 「${seen.get(e.space)}」と「${e.name}」`); else seen.set(e.space, e.name); }
 
+// 配置図にないスペース番号は地図に出ないので知らせる（配置図を差し替えたあとの番号ずれ対策）
+const layoutJson = JSON.parse(await fs.readFile(path.join(ROOT, "data", "layout.json"), "utf8"));
+const onMap = new Set(layoutJson.booths.map((b) => normalizeSpace(b[0])));
+for (const e of exhibitors) if (e.space && !onMap.has(e.space)) warn(`「${e.name}」のスペース ${e.space} は配置図にありません（地図に出ません）`);
+
 const data = {
   mode: live ? "live" : "sample",
   generatedAt: new Date().toISOString(),
@@ -268,6 +273,19 @@ for (const f of ["app.js", "style.css"]) {
 }
 for (const f of ["favicon.svg"]) await fs.copyFile(path.join(ROOT, "src", f), path.join(OUT, f));
 const ev = cfg.event;
+// ヘッダー右上の「by KUA StuHUB」。url が http(s) ならリンクにして別タブで開く
+const byline = (org = {}) => {
+  const name = org.shortName || org.name;
+  if (!name) return "";
+  // 狭い画面では先頭の語（KUA）を省いて「by StuHUB」にする
+  const [head, ...rest] = String(name).split(" ");
+  const label = rest.length
+    ? `<span class="by-pre">by</span> <span class="by-head">${escXml(head)} </span>${escXml(rest.join(" "))}`
+    : `<span class="by-pre">by</span> ${escXml(name)}`;
+  return /^https?:\/\//.test(org.url || "")
+    ? `<a class="byline" href="${escXml(org.url)}" target="_blank" rel="noopener">${label}<svg width="9" height="9" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2h6v6M10 2 3 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`
+    : `<span class="byline">${label}</span>`;
+};
 let html = await fs.readFile(path.join(ROOT, "src", "index.html"), "utf8");
 html = html
   .replaceAll("{{TITLE}}", escXml(ev.siteTitle))
@@ -275,6 +293,7 @@ html = html
   .replaceAll("{{NAME}}", escXml(ev.name))
   .replaceAll("{{YEAR}}", escXml(ev.year))
   .replaceAll("{{DATES}}", escXml(ev.dates))
+  .replaceAll("{{BYLINE}}", byline(cfg.org))
   .replaceAll("{{APP_JS}}", assets["app.js"])
   .replaceAll("{{STYLE_CSS}}", assets["style.css"]);
 await fs.writeFile(path.join(OUT, "index.html"), html);

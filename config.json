@@ -1,8 +1,10 @@
 {
   "_説明": "サイト全体の設定。年が変わったら event を書き換える。秘密の値（Notionのトークン）はここに書かない。",
   "org": {
-    "_説明": "運営団体。サイトのフッターに表示する。",
+    "_説明": "運営団体。サイトのフッターに表示する。url はヘッダー右上の「by KUA StuHUB」のリンク先（空ならリンクなしの文字だけ）。shortName はそこに出す短い名前。",
     "name": "KUA StuHUB（非公式）",
+    "shortName": "KUA StuHUB",
+    "url": "https://www.notion.so/3f8d14f8ecf581b8b238e44bb23b4415",
     "email": "kua.stuhub@gmail.com"
   },
   "event": {
