@@ -70,8 +70,7 @@ function renderSheet() {
   const C = DATA?.contact || {};
   const contact = [C.email ? `<span class="mail">${esc(C.email)}</span>` : "", C.url ? `<a href="${esc(safeUrl(C.url))}" target="_blank" rel="noopener">${esc(C.label || "窓口")}</a>` : ""].filter(Boolean).join(" または ") || "運営";
   const org = DATA?.org?.name ? `運営：${esc(DATA.org.name)}<br>` : "";
-  $("#sbody").innerHTML = `
-    ${S.searchOpen || S.q ? `<div class="search">${searchIco}<input id="q" type="search" placeholder="サークル名・スペース番号" value="${esc(S.q)}" autocomplete="off" enterkeyhint="search"></div>` : ""}
+  const rest = `
     <div class="cats" role="group" aria-label="頒布するもので絞り込み">
       ${CATS.map((c) => { const n = c.tags.filter((t) => S.tags.has(t)).length;
         return `<button type="button" class="cat${n ? " on" : ""}" data-cat="${esc(c.name)}" aria-expanded="${S.openCat === c.name}"><span class="tri">▸</span>${esc(c.name)}${n ? `<b>${n}</b>` : ""}</button>`; }).join("")}
@@ -81,6 +80,18 @@ function renderSheet() {
     <div class="grid">${list.length ? list.map(cardHTML).join("") :
       `<div class="empty">${S.scope === "fav" && !favs.size ? "お気に入りはまだありません。<br>カードの☆を押すと、ここに集まります。<br>この端末のブラウザにだけ保存されます。" : X.length ? "条件に合う出展者はいません。<br>タグを減らすか、検索語を変えてください。" : "掲載中の出展者はまだいません。<br>掲載が始まるまでお待ちください。"}</div>`}</div>
     <p class="foot">${S.sort === "shuffle" ? "並び順は見る人ごとにシャッフルされるので、特定の出展者がいつも上に来ることはありません。<br>" : ""}${updated ? `最終更新 ${esc(updated)}<br>` : ""}${org}有志による非公式の取り組みです。大学・学園祭実行委員会・物販イベント主催とは関係ありません。掲載内容の修正・削除は${contact}までご連絡ください。</p>`;
+  // 検索欄は作り直さずに残す（入力中に作り直すと、日本語の変換が壊れて文字が二重になる）
+  const body = $("#sbody"), showQ = S.searchOpen || S.q;
+  const keep = showQ ? body.querySelector(":scope > .search") : null;
+  if (keep) {
+    while (keep.previousSibling) keep.previousSibling.remove();
+    while (keep.nextSibling) keep.nextSibling.remove();
+    keep.insertAdjacentHTML("afterend", rest);
+    const q = keep.querySelector("#q");
+    if (q && q.value !== S.q && document.activeElement !== q) q.value = S.q; // 地図からスペースを選んだときなど
+  } else {
+    body.innerHTML = (showQ ? `<div class="search">${searchIco}<input id="q" type="search" placeholder="サークル名・スペース番号" value="${esc(S.q)}" autocomplete="off" enterkeyhint="search"></div>` : "") + rest;
+  }
 }
 let known = new Set();
 function thumbHTML(e) {
@@ -428,7 +439,7 @@ function bindEvents() {
     if (t.closest("#copyMail")) { copyMail(t.closest("#copyMail")); return; }
   });
   document.addEventListener("input", (ev) => {
-    if (ev.target.id === "q") { S.q = ev.target.value; const pos = ev.target.selectionStart; renderSheet(); renderMap(); const q = $("#q"); q.focus(); q.setSelectionRange(pos, pos); }
+    if (ev.target.id === "q") { S.q = ev.target.value; renderSheet(); renderMap(); }
   });
   document.addEventListener("keydown", (ev) => {
     if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches(".card,.booth[data-space]")) { ev.preventDefault(); ev.target.click(); }
