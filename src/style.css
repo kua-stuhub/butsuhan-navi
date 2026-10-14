@@ -130,7 +130,8 @@ a.byline:hover svg{opacity:1}
 
 .sbody{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-inline:16px;padding-block:0 calc(24px + env(safe-area-inset-bottom,0px))}
 .search{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:9px;padding-inline:12px;padding-block:0;margin-bottom:6px}
-.search input{border:0;background:none;outline:none;padding:9px 0;width:100%;min-width:0}
+/* iOS Safari は 16px 未満の入力欄にフォーカスすると画面を勝手に拡大するので 16px にする */
+.search input{border:0;background:none;outline:none;padding:9px 0;width:100%;min-width:0;font-size:16px}
 .search svg{flex:none;color:var(--muted)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 11px}
 .chip{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 11px;font-size:13px;cursor:pointer;line-height:1.55}
