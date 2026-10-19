@@ -558,7 +558,7 @@ function bindEvents() {
  * （ホーム画面に戻る・アプリやタブの切り替え・画面ロック）に、前回から30分以上たっていればまとめて送る。
  * 送れなかった分は残り、次の機会に送る。端末を見分ける番号は付けない。
  * 送り先は config.json の analytics.endpoint（Cloudflare Workers、worker/analytics.js）。空なら何もしない。 */
-const AN = { url: "", on: false }, SEND_GAP = 30 * 60 * 1000, T0 = performance.now();
+const AN = { url: "", on: false, ld: 0 }, SEND_GAP = 30 * 60 * 1000;
 function count(k) {
   if (!AN.on) return;
   const q = store.get("bn_q", {}); q[k] = (q[k] || 0) + 1; store.set("bn_q", q);
@@ -586,7 +586,7 @@ function startAnalytics() {
   count("pv"); count(`h:${new Date(Date.now() + 9 * 3600e3).getUTCHours()}`);
   // この端末ではじめて数えるときだけ「nv」を1つ足す（端末の数の目安。番号などは付けない）
   if (!store.get("bn_seen", 0)) { count("nv"); store.set("bn_seen", 1); }
-  count(`ld:${Math.min(30, Math.round((performance.now() - T0) / 1000))}`);
+  count(`ld:${AN.ld}`);
   flush(false);
 }
 function setConsent(yes) {
@@ -600,6 +600,8 @@ function setConsent(yes) {
 function initAnalytics() {
   AN.url = /^https:\/\//.test(DATA?.analytics?.endpoint || "") ? DATA.analytics.endpoint : "";
   if (!AN.url) return;
+  // ページを開いてから地図と一覧が出るまでの秒数。同意のお知らせを読む時間は含めない
+  AN.ld = Math.min(30, Math.round(performance.now() / 1000));
   const c = store.get("bn_consent", null);
   AN.on = c === "yes";
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(false); });
