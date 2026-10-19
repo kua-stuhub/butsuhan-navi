@@ -124,8 +124,11 @@
 `kua.stuhub@gmail.com` で https://dash.cloudflare.com/sign-up からアカウントを作り（無料）、画面で次のように進めます。画面の名前は変わることがあります。
 
 1. **データベースを作る**：左の「Storage & Databases」→「D1」→「Create」。名前は `butsuhan-analytics`
-2. **表を作る**：できたデータベースの「Console」に `worker/schema.sql` の中身を貼って「Execute」
-3. **受け取り口を作る**：左の「Workers & Pages」→「Create」→「Create Worker」。名前は `butsuhan-analytics` →「Deploy」→「Edit code」で中身を消して `worker/analytics.js` を貼り付け →「Deploy」
+2. **表を作る**：できたデータベースの「Console」に次の1行を貼って「Execute」（`worker/schema.sql` を丸ごと貼ると、改行が消えて全部コメント扱いになり「No SQL statements detected」と出る）
+   ```
+   CREATE TABLE IF NOT EXISTS batches (at TEXT NOT NULL, data TEXT NOT NULL);
+   ```
+3. **受け取り口を作る**：左の「Workers & Pages」→「Create」→「Start with Hello World!」。名前は `butsuhan-analytics` →「Deploy」→「Edit code」で中身を消して `worker/analytics.js` を貼り付け →「Deploy」
 4. **データベースをつなぐ**：その Worker の「Settings」→「Bindings」→「Add」→「D1 database」。Variable name は `DB`、データベースは 1 で作ったもの
 5. **設定値を入れる**：「Settings」→「Variables and Secrets」→「Add」
    - `SITE_ORIGIN`（Text）：`https://kua-stuhub.github.io`
