@@ -6,8 +6,8 @@
 //   3. node tools/exhibitor-report.mjs export.json data.json reports/
 //      → reports/<スペース>_<サークル名>.png ができる。1出展者だけなら最後に出展者の id を足す
 //
-// 載せるもの：お品書き（詳細）を開かれた回数・写真を開かれた回数・お気に入り（追加−解除）・共有された回数、
-// 全出展者の中央値との比（順位は出さない）、見られた時間帯、写真が何枚目まで見られたか。
+// 載せるもの：お品書き（詳細）を開かれた回数（サイト訪問100回あたり何回か）・写真を開かれた回数・
+// お気に入り（追加−解除）・共有された回数、見られた時間帯、写真が何枚目まで見られたか。他の出展者との比較や順位は出さない。
 // 文字は opentype.js で図形にして描くので、どの環境でも同じ見た目になる（フォントは assets/fonts/）。
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -65,8 +65,6 @@ function fitName(s, maxW) {
 const card = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="20" fill="${C.card}" stroke="${C.line}" stroke-width="2"/>`;
 
 /* ---------- 1枚分 ---------- */
-const all = exhibitors.map((e) => n(`d:${e.id}`)).sort((a, b) => a - b);
-const median = all.length ? all[Math.floor(all.length / 2)] : 0;
 
 function slide(e) {
   const ev = cfg.event, d = n(`d:${e.id}`), p = n(`p:${e.id}`), fav = n(`f+:${e.id}`) - n(`f-:${e.id}`), sh = n(`s:${e.id}`);
@@ -105,9 +103,9 @@ function slide(e) {
 
   // 数字4つ
   const ky = 330, kh = 250, gap = 28, kw = (W - M * 2 - gap * 3) / 4;
-  const ratio = median ? d / median : 0;
+  const pv = n("pv"), per100 = pv ? (d / pv * 100 < 10 ? (d / pv * 100).toFixed(1) : Math.round(d / pv * 100)) : 0;
   const kpis = [
-    ["お品書きを開かれた回数", d, median ? `全出展者の中央値の ${ratio.toFixed(1)} 倍` : ""],
+    ["お品書きを開かれた回数", d, pv ? `サイト訪問100回あたり 約${per100}回` : ""],
     ["写真を開かれた回数", p, d ? `開いた人のうち ${Math.round(Math.min(1, p / d) * 100)}% が写真まで` : ""],
     ["お気に入り登録", fav, "追加された数から解除を引いた数"],
     ["共有された回数", sh, "共有ボタンが押された回数"],
