@@ -535,10 +535,10 @@ function showConsent() {
   const d = document.createElement("div");
   d.className = "consent";
   d.innerHTML = `<div class="consent-scrim"></div><section class="consent-card" role="dialog" aria-modal="true" aria-labelledby="cs-t" tabindex="-1">
-    <h2 id="cs-t">出展者のための、協力のお願い</h2>
-    <p>どのお品書きが何回見られたか、お気に入りされたかを数えて、イベントのあとに出展者のみなさんへお届けします。次の作品づくりや頒布の参考にしてもらうためです。名前・連絡先・位置情報など、あなたを特定できる情報は集めません。</p>
+    <h2 id="cs-t">出展者支援のためのご協力のお願い</h2>
+    <p>本サイトでは、各お品書きの閲覧回数やお気に入り登録数を集計し、イベント終了後に出展者の皆さまへお届けしています。今後の制作・頒布活動の参考としていただくためのものです。氏名・連絡先・位置情報など、個人を特定できる情報は取得いたしません。</p>
     <div class="consent-btns"><button type="button" class="btn" data-consent="yes">協力する</button><button type="button" class="btn alt" data-consent="no">協力しない</button></div>
-    <p class="consent-note">協力しなくても、サイトはすべての機能を使えます。あとから「？」でいつでも変えられます。<br><button type="button" class="linkish" data-consent-more>データの取り扱いについて</button></p>
+    <p class="consent-note">ご協力いただけない場合も、本サイトの機能はすべてご利用いただけます。設定は「？」メニューからいつでも変更できます。<br><button type="button" class="linkish" data-consent-more>データの取り扱いについて</button></p>
   </section>`;
   document.body.appendChild(d);
   requestAnimationFrame(() => requestAnimationFrame(() => d.classList.add("open")));
@@ -582,7 +582,7 @@ function renderHelp() {
     </div>
     ${AN.url ? `<h3 id="policy">データの取り扱い</h3>
     <div class="help-contact">
-      <p>出展者のためのデータ集め：<b>${AN.on ? "協力しています" : "協力していません"}</b></p>
+      <p>出展者支援のための集計：<b>${AN.on ? "協力しています" : "協力していません"}</b></p>
       <button type="button" class="btn alt" data-consent="${AN.on ? "no" : "yes"}">${AN.on ? "協力をやめる" : "協力する"}</button>
       <details class="policy" id="policyText"><summary>データの取り扱いについて</summary>${POLICY}</details>
     </div>` : ""}
