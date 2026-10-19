@@ -40,6 +40,7 @@
 | `scripts/ogp.mjs` | 共有したときのプレビュー画像（地図カード）を作るプログラム | 開発担当 |
 | `worker/` | アクセス解析の受け取り口（Cloudflare Workers と D1 のテーブル） | 最初の設定だけ |
 | `tools/analytics-report.mjs` | アクセス解析の集計を出展者ごとの表（CSV）にする | イベントのあと |
+| `tools/exhibitor-report.mjs` | 出展者に渡すレポートを1枚の画像にする | イベントのあと |
 | `assets/fonts/` | プレビュー画像に使うフォント（SIL Open Font License） | ふつうは触らない |
 | `tools/map-editor.html` | 配置図エディタ（PCのブラウザで開く） | 配置図が変わったとき |
 | `tools/gmail-to-discord.gs` | 問い合わせメールを Discord に通知する（Google Apps Script） | 最初の設定だけ |
@@ -140,6 +141,7 @@
 ### 集計を見る
 1. ブラウザで `<Workers のURL>/export?token=<EXPORT_TOKEN>` を開くと、合計の数字が出ます。`export.json` として保存
 2. 公開サイトの `data.json` を保存して `node tools/analytics-report.mjs export.json data.json > report.csv` を実行すると、出展者ごとの表になります
+3. 出展者に渡すレポート画像（1出展者1枚、1920×1080）は `node tools/exhibitor-report.mjs export.json data.json reports/`。`reports/<スペース>_<サークル名>.png` ができます（1出展者だけなら最後に出展者の id を足す）
 
 ### 無料枠
 Workers は1日10万リクエスト、D1 は1日10万行の書き込みまで無料です（日本時間の朝9時に戻る）。1回の送信が1リクエスト・1行なので、1.5万人が同意しても1日数万件の見込みです。超えた場合はその日の送信が失敗するだけで、サイトは普通に見られ、数字はスマホに残って次の機会に送られます。
