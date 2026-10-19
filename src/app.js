@@ -192,7 +192,7 @@ function openLightbox(e, start) {
   function go(i) {
     if (i < 0 || i >= n) { setTrack(0, true); return; }
     if (i !== idx) { st[idx] = { s: 1, x: 0, y: 0 }; setImg(idx); }
-    idx = i; setTrack(0, true); ui();
+    idx = i; setTrack(0, true); ui(); seePage(i);
   }
   const rectTransform = (r) => `translate(${r.left + r.width / 2 - W / 2}px,${r.top + r.height / 2 - H / 2}px) scale(${r.width / F[idx].w})`;
   function close() {
@@ -204,6 +204,8 @@ function openLightbox(e, start) {
     setTimeout(() => { lb.remove(); const f = thumbEl(idx); if (f) f.focus(); }, reduce ? 0 : 320);
   }
 
+  const seen = new Set(), seePage = (i) => { if (!seen.has(i)) { seen.add(i); count(`pg:${e.id}:${i + 1}`); } };
+  count(`p:${e.id}`); seePage(start);
   fit(); setTrack(0); ui();
   const r0 = thumbEl(start)?.getBoundingClientRect();
   if (r0 && r0.width && !reduce) imgs[idx].style.transform = rectTransform(r0);
@@ -429,40 +431,46 @@ function syncUrl() {
   try { const u = new URL(location.href); S.detail && !S.detail.vacant ? u.searchParams.set("e", S.detail.id) : u.searchParams.delete("e"); history.replaceState(null, "", u); } catch {}
 }
 
-function openDetail(e, fromMap) { S.mode = "detail"; S.detail = e; syncUrl(); renderSheet(); if (!wide()) S.snap = 1; sizeGallery(); placeSheet(); renderMap(); setTimeout(() => focusBooth(e.space), fromMap ? 0 : 80); }
+function openDetail(e, fromMap, src) {
+  if (!e.vacant) { count(`d:${e.id}`); count(`dh:${e.id}:${dayPart()}`); count(`from:${src || (fromMap ? "map" : "list")}`); }
+  S.mode = "detail"; S.detail = e; syncUrl(); renderSheet(); if (!wide()) S.snap = 1; sizeGallery(); placeSheet(); renderMap(); setTimeout(() => focusBooth(e.space), fromMap ? 0 : 80); }
 function backToList() { S.mode = "list"; S.detail = null; syncUrl(); renderSheet(); placeSheet(); renderMap(); }
-function toggleFav(id) { favs.has(id) ? favs.delete(id) : favs.add(id); store.set("bn_favs", [...favs]); renderSheet(); renderMap(); }
+function toggleFav(id) { count(`${favs.has(id) ? "f-" : "f+"}:${id}`); favs.has(id) ? favs.delete(id) : favs.add(id); store.set("bn_favs", [...favs]); renderSheet(); renderMap(); }
 function rerender() { renderSheet(); renderMap(); }
 
 function bindEvents() {
   document.addEventListener("click", (ev) => {
     const t = ev.target;
     const fav = t.closest("[data-fav]"); if (fav) { ev.stopPropagation(); toggleFav(fav.dataset.fav); return; }
-    const chip = t.closest(".chip"); if (chip) { const g = chip.dataset.tag; S.tags.has(g) ? S.tags.delete(g) : S.tags.add(g); rerender(); return; }
-    const sc = t.closest("[data-scope]"); if (sc) { S.scope = sc.dataset.scope; rerender(); return; }
+    const chip = t.closest(".chip"); if (chip) { const g = chip.dataset.tag; S.tags.has(g) ? S.tags.delete(g) : (S.tags.add(g), count(`t:${g}`)); rerender(); if (filtering() && !visible().length) count("zero"); return; }
+    const sc = t.closest("[data-scope]"); if (sc) { S.scope = sc.dataset.scope; if (S.scope === "fav") count("scope:fav"); rerender(); return; }
     const card = t.closest(".card"); if (card) { openDetail(X.find((e) => e.id === card.dataset.id)); return; }
     const booth = t.closest(".booth[data-space]"); if (booth) { if (ev.detail === 0) boothTapped(booth.dataset.space); return; } // pointer taps go through the map gestures
     if (t.closest("#back")) { backToList(); return; }
     const pgb = t.closest("[data-page]"); if (pgb && S.detail) { openLightbox(S.detail, +pgb.dataset.page); return; }
     if (t.closest("#d-fav")) { toggleFav(S.detail.id); return; }
-    if (t.closest("#d-share")) { share(S.detail); return; }
-    if (t.closest("#d-copy")) { copyLink(S.detail, t.closest("#d-copy")); return; }
+    if (t.closest("#d-share")) { count(`s:${S.detail.id}`); share(S.detail); return; }
+    if (t.closest("#d-copy")) { count(`s:${S.detail.id}`); copyLink(S.detail, t.closest("#d-copy")); return; }
+    if (t.closest("#d-post")) { count(`s:${S.detail.id}`); return; }
     if (t.closest("#d-map")) { if (!wide()) setSnap(0); else focusBooth(S.detail.space); return; }
     const cat = t.closest("[data-cat]"); if (cat) { S.openCat = S.openCat === cat.dataset.cat ? null : cat.dataset.cat; renderSheet(); return; }
-    if (t.closest("#b-sort")) { S.sort = S.sort === "shuffle" ? "space" : "shuffle"; store.set("bn_sort", S.sort); renderSheet(); return; }
+    if (t.closest("#b-sort")) { S.sort = S.sort === "shuffle" ? "space" : "shuffle"; store.set("bn_sort", S.sort); count(`sort:${S.sort}`); renderSheet(); return; }
     if (t.closest("#b-search")) { S.searchOpen = !(S.searchOpen || S.q); if (!S.searchOpen) S.q = ""; rerender(); if (S.searchOpen) $("#q")?.focus(); return; }
     if (t.closest("#clear")) { S.tags.clear(); S.q = ""; rerender(); return; }
-    if (t.closest("#b-proj")) { S.proj = S.proj === "iso" ? "flat" : "iso"; store.set("bn_proj", S.proj); $("#b-proj").textContent = S.proj === "iso" ? "平面" : "立体"; renderMap(); return; }
+    if (t.closest("#b-proj")) { S.proj = S.proj === "iso" ? "flat" : "iso"; store.set("bn_proj", S.proj); count(`proj:${S.proj}`); $("#b-proj").textContent = S.proj === "iso" ? "平面" : "立体"; renderMap(); return; }
     if (t.closest("#b-help")) { openHelp(); return; }
     if (t.closest("[data-help-close]")) { closeHelp(); return; }
     if (t.closest("#copyMail")) { copyMail(t.closest("#copyMail")); return; }
+    const cs = t.closest("[data-consent]"); if (cs) { setConsent(cs.dataset.consent === "yes"); return; }
+    if (t.closest("[data-consent-more]")) { openHelp("policy"); return; }
   });
   document.addEventListener("input", (ev) => {
-    if (ev.target.id === "q") { S.q = ev.target.value; renderSheet(); renderMap(); }
+    if (ev.target.id === "q") { if (!S.q.trim() && ev.target.value.trim()) count("q"); S.q = ev.target.value; renderSheet(); renderMap(); }
   });
   document.addEventListener("keydown", (ev) => {
     if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches(".card,.booth[data-space]")) { ev.preventDefault(); ev.target.click(); }
     if (ev.key === "Escape" && !$("#help").hidden) { closeHelp(); return; }
+    if (ev.key === "Escape" && $(".consent")) return;
     if (ev.key === "Escape" && S.mode === "detail" && !document.querySelector(".lb")) backToList();
   });
   let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { placeSheet(); renderMap(); sizeGallery(); }, 120); });
@@ -470,6 +478,85 @@ function bindEvents() {
   ["#stage", ".app"].forEach((s) => { const el = $(s); el.addEventListener("scroll", () => { el.scrollTop = 0; el.scrollLeft = 0; }); });
 }
 
+
+/* ---------- アクセス解析 ----------
+ * 同意した人だけ。操作の回数を端末（localStorage の bn_q）で数えておき、画面が隠れたとき
+ * （ホーム画面に戻る・アプリやタブの切り替え・画面ロック）に、前回から30分以上たっていればまとめて送る。
+ * 送れなかった分は残り、次の機会に送る。端末を見分ける番号は付けない。
+ * 送り先は config.json の analytics.endpoint（Cloudflare Workers、worker/analytics.js）。空なら何もしない。 */
+const AN = { url: "", on: false }, SEND_GAP = 30 * 60 * 1000, T0 = performance.now();
+function count(k) {
+  if (!AN.on) return;
+  const q = store.get("bn_q", {}); q[k] = (q[k] || 0) + 1; store.set("bn_q", q);
+}
+// 日本時間で、開催前／当日の午前・昼・午後のどれか
+function dayPart() {
+  const j = new Date(Date.now() + 9 * 3600e3), day = j.toISOString().slice(0, 10), h = j.getUTCHours(), start = DATA?.event?.start || "";
+  return start && day < start ? "pre" : h < 12 ? "am" : h < 14 ? "mid" : "pm";
+}
+function flush(force) {
+  if (!AN.on || !navigator.sendBeacon) return;
+  const q = store.get("bn_q", {}), keys = Object.keys(q);
+  if (!keys.length || (!force && Date.now() - store.get("bn_qt", 0) < SEND_GAP)) return;
+  const left = {};
+  for (let i = 0; i < keys.length; i += 150) { // 1回に送る量を小さく保つ
+    const part = Object.fromEntries(keys.slice(i, i + 150).map((k) => [k, q[k]]));
+    if (!navigator.sendBeacon(AN.url, new Blob([JSON.stringify(part)], { type: "text/plain" }))) Object.assign(left, part);
+  }
+  // 送っている間に増えた分も残す
+  const now = store.get("bn_q", {}); for (const k of Object.keys(now)) if (now[k] !== q[k]) left[k] = (left[k] || 0) + now[k] - (q[k] || 0);
+  store.set("bn_q", left); store.set("bn_qt", Date.now());
+}
+function startAnalytics() {
+  if (!AN.on) return;
+  count("pv"); count(`h:${new Date(Date.now() + 9 * 3600e3).getUTCHours()}`);
+  count(`ld:${Math.min(30, Math.round((performance.now() - T0) / 1000))}`);
+  flush(false);
+}
+function setConsent(yes) {
+  store.set("bn_consent", yes ? "yes" : "no");
+  const was = AN.on; AN.on = yes && !!AN.url;
+  if (!yes) { store.set("bn_q", {}); }
+  $(".consent")?.remove();
+  if (AN.on && !was) startAnalytics();
+  if (!$("#help").hidden) renderHelp();
+}
+function initAnalytics() {
+  AN.url = /^https:\/\//.test(DATA?.analytics?.endpoint || "") ? DATA.analytics.endpoint : "";
+  if (!AN.url) return;
+  const c = store.get("bn_consent", null);
+  AN.on = c === "yes";
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(false); });
+  window.addEventListener("pagehide", () => flush(false));
+  document.addEventListener("error", (ev) => { if (ev.target?.tagName === "IMG") count("imgerr"); }, true);
+  if (c == null) showConsent(); else startAnalytics();
+}
+function showConsent() {
+  const d = document.createElement("div");
+  d.className = "consent";
+  d.innerHTML = `<div class="consent-scrim"></div><section class="consent-card" role="dialog" aria-modal="true" aria-labelledby="cs-t" tabindex="-1">
+    <h2 id="cs-t">アクセス解析に関するお知らせ</h2>
+    <p>本サイトでは、サービスの改善および掲載者へのフィードバックを目的として、閲覧状況に関する統計情報を取得します。取得する情報には、氏名・連絡先・位置情報等の個人を特定できる情報は含まれません。詳しくは「データの取り扱いについて」をご確認ください。</p>
+    <div class="consent-btns"><button type="button" class="btn" data-consent="yes">同意する</button><button type="button" class="btn alt" data-consent="no">同意しない</button></div>
+    <p class="consent-note">※同意しない場合も、本サイトの機能はすべてご利用いただけます。設定は「？」メニューからいつでも変更できます。<br><button type="button" class="linkish" data-consent-more>データの取り扱いについて</button></p>
+  </section>`;
+  document.body.appendChild(d);
+  requestAnimationFrame(() => requestAnimationFrame(() => d.classList.add("open")));
+  d.querySelector(".consent-card").focus({ preventScroll: true });
+}
+const POLICY = `<div class="policy-body">
+<p>KUA StuHUB（非公式）（以下「当団体」といいます）は、当団体が運営する「大瓜生山祭 物販ナビ（非公式）」（以下「本サイト」といいます）における閲覧状況に関する情報（以下「統計情報」といいます）の取り扱いについて、以下のとおり定めます。</p>
+<h4>第1条（取得する情報）</h4><p>当団体は、利用者が本サイト上で統計情報の取得に同意した場合に限り、次の情報を取得します。</p>
+<ol><li>各出展者の詳細情報およびお品書き画像の表示回数</li><li>各出展者のお気に入り登録および解除の回数、ならびに共有機能の利用回数</li><li>絞り込み・検索・並び替え等の機能の利用回数（検索語句は含みません）、出展者情報の表示元（地図、一覧または共有リンク）、閲覧した時間帯、ページの表示に要した時間、および画像の読み込みに失敗した回数</li></ol>
+<h4>第2条（取得しない情報）</h4><p>当団体は、氏名、連絡先、位置情報、検索語句その他利用者個人を特定できる情報、および端末を識別する情報を取得しません。お気に入りの登録内容は、利用者の端末内にのみ保存され、当団体に送信されません。</p>
+<h4>第3条（利用目的）</h4><p>当団体は、統計情報を次の目的のために利用します。</p><ol><li>各出展者に対する、当該出展者に係る集計結果の提供</li><li>本サイトの利用状況の把握および改善</li><li>当団体の活動記録の作成</li></ol>
+<h4>第4条（第三者提供）</h4><p>当団体は、前条第1号に定める場合を除き、統計情報を第三者に提供しません。また、出展者ごとの集計結果の順位付けその他の比較情報を公開しません。</p>
+<h4>第5条（外部サービスの利用）</h4><p>当団体は、統計情報の受信および保存にあたり、Cloudflare, Inc.（米国）が提供するサービスを利用します。通信の性質上、送信元の IP アドレスが同社のサーバーに送信されますが、当団体はこれを保存しません。</p>
+<h4>第6条（保存期間）</h4><p>当団体は、取得した統計情報を2026年12月31日までに削除し、以後は集計後の数値のみを保持します。</p>
+<h4>第7条（同意の撤回）</h4><p>利用者は、「？」メニューから設定を変更することにより、いつでも同意を撤回することができます。撤回後、当団体は当該端末から統計情報を取得しません。</p>
+<h4>第8条（改定）</h4><p>当団体は、必要に応じて本規定を改定することがあります。改定後の内容は、本サイトに掲載した時点から効力を生じるものとします。</p>
+<h4>第9条（お問い合わせ）</h4><p>本規定に関するお問い合わせは、kua.stuhub@gmail.com までご連絡ください。</p>
+<p class="policy-date">制定日：2026年10月</p></div>`;
 
 /* ---------- help modal: how to use + contact ---------- */
 let helpReturn = null;
@@ -493,14 +580,21 @@ function renderHelp() {
       ${C.email ? `<div class="mailrow"><span class="addr" id="mailAddr">${esc(C.email)}</span><button type="button" id="copyMail">コピー</button></div>` : ""}
       ${C.url ? `<p><a href="${esc(safeUrl(C.url))}" target="_blank" rel="noopener">${esc(C.label || C.url)}</a></p>` : ""}
     </div>
+    ${AN.url ? `<h3 id="policy">データの取り扱い</h3>
+    <div class="help-contact">
+      <p>アクセス解析：<b>${AN.on ? "同意しています" : "同意していません"}</b></p>
+      <button type="button" class="btn alt" data-consent="${AN.on ? "no" : "yes"}">${AN.on ? "同意をやめる" : "同意する"}</button>
+      <details class="policy" id="policyText"><summary>データの取り扱いについて</summary>${POLICY}</details>
+    </div>` : ""}
     ${form ? `<h3>出展者の方へ</h3><a class="help-form" href="${esc(safeUrl(form))}" target="_blank" rel="noopener">掲載フォームを開く ›</a>` : ""}
     <p class="help-note">有志による非公式の取り組みです。大学・学園祭実行委員会・物販イベント主催とは関係ありません。${updated ? `<br>最終更新 ${esc(updated)}` : ""}</p>`;
 }
-function openHelp() {
-  helpReturn = document.activeElement; renderHelp();
+function openHelp(section) {
+  helpReturn = document.activeElement; renderHelp(); count("help");
   const h = $("#help"); h.hidden = false;
   requestAnimationFrame(() => requestAnimationFrame(() => h.classList.add("open")));
   $("#help .help-card").focus({ preventScroll: true });
+  if (section === "policy" && $("#policyText")) { $("#policyText").open = true; $("#policy").scrollIntoView(); }
 }
 function closeHelp() {
   const h = $("#help"); if (h.hidden) return;
@@ -537,7 +631,8 @@ async function boot() {
   renderSheet(); placeSheet(); renderMap();
   // 共有リンク（?e=<id>）から来たら、その出展者を開く。もう掲載されていなければ一覧のまま
   const want = new URLSearchParams(location.search).get("e"), hit = want && X.find((e) => e.id === want);
-  if (hit) openDetail(hit); else if (want) syncUrl();
+  initAnalytics();
+  if (hit) openDetail(hit, false, "link"); else if (want) syncUrl();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
 })();

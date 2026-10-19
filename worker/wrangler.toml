@@ -1,0 +1,16 @@
+# コマンドで公開する人向けの設定（Cloudflare の画面だけで設定する場合は不要）
+#   npx wrangler d1 create butsuhan-analytics   → 表示された database_id を下に書く
+#   npx wrangler d1 execute butsuhan-analytics --remote --file=schema.sql
+#   npx wrangler secret put EXPORT_TOKEN
+#   npx wrangler deploy
+name = "butsuhan-analytics"
+main = "analytics.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+SITE_ORIGIN = "https://kua-stuhub.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "butsuhan-analytics"
+database_id = "ここに database_id を書く"
