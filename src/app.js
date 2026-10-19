@@ -123,7 +123,9 @@ function renderDetail() {
       : `<div class="empty" style="margin-bottom:12px">お品書きは準備中です</div>`}
     ${e.comment ? `<dl class="meta"><dt>ひとこと</dt><dd>${esc(e.comment)}</dd></dl>` : ""}
     <div class="actions" style="margin-bottom:14px"><button type="button" class="btn" id="d-fav" aria-pressed="${favs.has(e.id)}">${favs.has(e.id) ? "★ お気に入り済み" : "☆ お気に入り"}</button>
-      ${B.some((b) => String(b[0]) === e.space) ? `<button type="button" class="btn alt" id="d-map">地図で見る</button>` : ""}</div>
+      ${B.some((b) => String(b[0]) === e.space) ? `<button type="button" class="btn alt" id="d-map">地図で見る</button>` : ""}
+      ${navigator.share ? `<button type="button" class="btn alt" id="d-share">共有</button>`
+        : `<button type="button" class="btn alt" id="d-copy">リンクをコピー</button><a class="btn alt" id="d-post" href="${esc(postUrl(e))}" target="_blank" rel="noopener">Xでポスト</a>`}</div>
     ${e.sns.length ? `<dl class="meta"><dt>SNS</dt><dd>${sns}</dd></dl>` : ""}`;
   $("#sbody").scrollTop = 0;
   sizeGallery();
@@ -412,8 +414,23 @@ function initSheetDrag() {
 }
 
 /* ---------- actions ---------- */
-function openDetail(e, fromMap) { S.mode = "detail"; S.detail = e; renderSheet(); if (!wide()) S.snap = 1; sizeGallery(); placeSheet(); renderMap(); setTimeout(() => focusBooth(e.space), fromMap ? 0 : 80); }
-function backToList() { S.mode = "list"; S.detail = null; renderSheet(); placeSheet(); renderMap(); }
+/* 共有：出展者ごとのページ e/<id>/ を共有する（SNS ではそのブースの地図カードがプレビューに出る） */
+const shareUrl = (e) => new URL(`e/${encodeURIComponent(e.id)}/`, location.href.replace(/[?#].*$/, "")).href;
+const shareText = (e) => `${e.name}（スペース${e.space || "—"}）｜${DATA?.event?.siteTitle || document.title}`;
+const postUrl = (e) => `https://x.com/intent/post?text=${encodeURIComponent(shareText(e))}&url=${encodeURIComponent(shareUrl(e))}`;
+function share(e) { navigator.share({ title: shareText(e), text: shareText(e), url: shareUrl(e) }).catch(() => {}); }
+function copyLink(e, btn) {
+  const done = (msg) => { btn.textContent = msg; setTimeout(() => (btn.textContent = "リンクをコピー"), 1600); };
+  try { navigator.clipboard.writeText(shareUrl(e)).then(() => done("コピーしました"), () => prompt("このリンクをコピーしてください", shareUrl(e))); }
+  catch { prompt("このリンクをコピーしてください", shareUrl(e)); }
+}
+// 開いている出展者を URL（?e=<id>）に残す。再読み込みやアドレスバーからのコピーでも同じ出展者が開く
+function syncUrl() {
+  try { const u = new URL(location.href); S.detail && !S.detail.vacant ? u.searchParams.set("e", S.detail.id) : u.searchParams.delete("e"); history.replaceState(null, "", u); } catch {}
+}
+
+function openDetail(e, fromMap) { S.mode = "detail"; S.detail = e; syncUrl(); renderSheet(); if (!wide()) S.snap = 1; sizeGallery(); placeSheet(); renderMap(); setTimeout(() => focusBooth(e.space), fromMap ? 0 : 80); }
+function backToList() { S.mode = "list"; S.detail = null; syncUrl(); renderSheet(); placeSheet(); renderMap(); }
 function toggleFav(id) { favs.has(id) ? favs.delete(id) : favs.add(id); store.set("bn_favs", [...favs]); renderSheet(); renderMap(); }
 function rerender() { renderSheet(); renderMap(); }
 
@@ -428,6 +445,8 @@ function bindEvents() {
     if (t.closest("#back")) { backToList(); return; }
     const pgb = t.closest("[data-page]"); if (pgb && S.detail) { openLightbox(S.detail, +pgb.dataset.page); return; }
     if (t.closest("#d-fav")) { toggleFav(S.detail.id); return; }
+    if (t.closest("#d-share")) { share(S.detail); return; }
+    if (t.closest("#d-copy")) { copyLink(S.detail, t.closest("#d-copy")); return; }
     if (t.closest("#d-map")) { if (!wide()) setSnap(0); else focusBooth(S.detail.space); return; }
     const cat = t.closest("[data-cat]"); if (cat) { S.openCat = S.openCat === cat.dataset.cat ? null : cat.dataset.cat; renderSheet(); return; }
     if (t.closest("#b-sort")) { S.sort = S.sort === "shuffle" ? "space" : "shuffle"; store.set("bn_sort", S.sort); renderSheet(); return; }
@@ -516,6 +535,9 @@ async function boot() {
     return;
   }
   renderSheet(); placeSheet(); renderMap();
+  // 共有リンク（?e=<id>）から来たら、その出展者を開く。もう掲載されていなければ一覧のまま
+  const want = new URLSearchParams(location.search).get("e"), hit = want && X.find((e) => e.id === want);
+  if (hit) openDetail(hit); else if (want) syncUrl();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
 })();

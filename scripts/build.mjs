@@ -6,6 +6,7 @@
 //      - なければ data/sample.json のダミーデータを使う（試運転）
 //   2. お品書き画像をダウンロードして、一覧用（小）と拡大用（大）の webp に圧縮する
 //   3. dist/ に公開用ファイル一式（index.html, app.js, style.css, data.json, layout.json, img/）を書き出す
+//   4. 共有用に、出展者ごとのページ（e/<id>/）とプレビュー画像（ogp/）を作る（scripts/ogp.mjs）
 //
 // 連絡先（非公開）の列は読み込まないので、サイトに出ることはない。
 //
@@ -17,6 +18,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { buildOgp } from "./ogp.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = path.join(ROOT, "dist");
@@ -251,6 +253,15 @@ const layoutJson = JSON.parse(await fs.readFile(path.join(ROOT, "data", "layout.
 const onMap = new Set(layoutJson.booths.map((b) => normalizeSpace(b[0])));
 for (const e of exhibitors) if (e.space && !onMap.has(e.space)) warn(`「${e.name}」のスペース ${e.space} は配置図にありません（地図に出ません）`);
 
+// 共有用のプレビュー画像。og:image は絶対URLが必要なので、config.json の site.url が空なら作らない
+const siteUrl = String(cfg.site?.url || "").replace(/\/?$/, "/");
+const okId = (id) => /^[A-Za-z0-9_-]+$/.test(id);
+let ogp = {};
+if (/^https?:\/\//.test(siteUrl)) {
+  if (!sharp) await loadSharp();
+  ogp = await buildOgp({ root: ROOT, out: OUT, cache: path.join(ROOT, ".cache", "ogp"), exhibitors: exhibitors.filter((e) => okId(e.id)), layout: layoutJson, cfg, sharp, warn });
+} else warn("config.json の site.url が空のため、共有用のプレビュー画像を作りません");
+
 const data = {
   mode: live ? "live" : "sample",
   generatedAt: new Date().toISOString(),
@@ -295,8 +306,43 @@ html = html
   .replaceAll("{{DATES}}", escXml(ev.dates))
   .replaceAll("{{BYLINE}}", byline(cfg.org))
   .replaceAll("{{APP_JS}}", assets["app.js"])
-  .replaceAll("{{STYLE_CSS}}", assets["style.css"]);
+  .replaceAll("{{STYLE_CSS}}", assets["style.css"])
+  .replaceAll("{{OG_EXTRA}}", ogMeta(siteUrl, ogp.site));
 await fs.writeFile(path.join(OUT, "index.html"), html);
+
+// 出展者ごとの共有ページ e/<id>/。SNS がプレビューを作るときに読む情報だけを書いて、人が開いたら本体の詳細へ移る
+function ogMeta(pageUrl, img) {
+  if (!/^https?:\/\//.test(siteUrl)) return "";
+  return `<meta property="og:url" content="${escXml(pageUrl)}">` + (img
+    ? `\n<meta property="og:image" content="${escXml(siteUrl + img)}">\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta name="twitter:card" content="summary_large_image">`
+    : `\n<meta name="twitter:card" content="summary">`);
+}
+for (const e of exhibitors) {
+  if (!okId(e.id)) { warn(`「${e.name}」のIDに使えない文字があるため、共有ページを作りません`); continue; }
+  const title = `${e.name}（スペース${e.space || "—"}）｜${ev.siteTitle}`;
+  const desc = e.comment || (e.tags.length ? `頒布：${e.tags.join("・")}` : ev.description);
+  const target = `../../?e=${e.id}`;
+  await fs.mkdir(path.join(OUT, "e", e.id), { recursive: true });
+  await fs.writeFile(path.join(OUT, "e", e.id, "index.html"), `<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escXml(title)}</title>
+<meta name="description" content="${escXml(desc)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="${escXml(ev.siteTitle)}">
+<meta property="og:title" content="${escXml(title)}">
+<meta property="og:description" content="${escXml(desc)}">
+<meta property="og:locale" content="ja_JP">
+${ogMeta(`${siteUrl}e/${e.id}/`, ogp[e.id] || ogp.site)}
+<meta http-equiv="refresh" content="0; url=${target}">
+<script>location.replace(${JSON.stringify(target)} + location.hash)</script>
+</head>
+<body><p><a href="${target}">${escXml(ev.siteTitle)}で開く</a></p></body>
+</html>
+`);
+}
 await fs.writeFile(path.join(OUT, ".nojekyll"), "");
 
 console.log(`✔ ${exhibitors.length}件の出展者、画像${exhibitors.reduce((n, e) => n + e.images.length, 0)}枚で dist/ を作成しました`);
