@@ -220,3 +220,23 @@ a.btn{display:inline-block;text-decoration:none;line-height:1.6}
 .loading{color:var(--muted);font-size:13px;text-align:center;padding-block:28px}
 .foot a{color:inherit}
 .foot .mail{user-select:all;-webkit-user-select:all;font-weight:700;color:var(--fg)}
+
+/* アクセス解析の同意モーダル（はじめて開いたときだけ） */
+.consent{position:fixed;inset:0;z-index:55;display:flex;align-items:flex-end;justify-content:center}
+.consent-scrim{position:absolute;inset:0;background:rgba(10,10,12,.45);opacity:0;transition:opacity .22s ease}
+.consent.open .consent-scrim{opacity:1}
+.consent-card{position:relative;width:min(480px,100%);background:var(--card);color:var(--fg);border-radius:18px 18px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.25);padding-inline:20px;padding-block:20px calc(20px + env(safe-area-inset-bottom,0px));transform:translateY(24px);opacity:0;transition:transform .26s cubic-bezier(.2,.8,.2,1),opacity .2s ease;outline:none}
+.consent.open .consent-card{transform:none;opacity:1}
+@media (min-width:600px){.consent{align-items:center}.consent-card{border-radius:16px}}
+.consent-card h2{margin:0 0 8px;font-size:16px;font-weight:900}
+.consent-card p{margin:0;font-size:13px;line-height:1.7;color:var(--muted)}
+.consent-btns{display:flex;gap:8px;margin-block:14px 10px}
+.consent-btns .btn{flex:1}
+.consent-note{font-size:11px!important}
+.linkish{appearance:none;border:0;background:none;padding:0;margin-top:4px;color:var(--fg);text-decoration:underline;font:inherit;font-size:12px;cursor:pointer}
+.policy summary{cursor:pointer;font-size:13px;font-weight:700}
+.policy-body{font-size:12px;line-height:1.75;color:var(--muted)}
+.policy-body h4{font-size:12px;color:var(--fg);margin:12px 0 2px}
+.policy-body p,.policy-body ol{margin:0}
+.policy-body ol{padding-left:1.4em}
+.policy-date{margin-top:12px!important}

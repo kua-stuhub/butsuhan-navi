@@ -269,6 +269,7 @@ const data = {
   org: cfg.org,
   contact: cfg.contact,
   form: cfg.form,
+  analytics: { endpoint: cfg.analytics?.endpoint || "" },
   categories,
   exhibitors,
 };

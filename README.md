@@ -38,6 +38,8 @@
 | `src/` | サイトの見た目と動き（HTML / CSS / JavaScript） | 開発担当 |
 | `scripts/build.mjs` | データを集めてサイトを作るプログラム | 開発担当 |
 | `scripts/ogp.mjs` | 共有したときのプレビュー画像（地図カード）を作るプログラム | 開発担当 |
+| `worker/` | アクセス解析の受け取り口（Cloudflare Workers と D1 のテーブル） | 最初の設定だけ |
+| `tools/analytics-report.mjs` | アクセス解析の集計を出展者ごとの表（CSV）にする | イベントのあと |
 | `assets/fonts/` | プレビュー画像に使うフォント（SIL Open Font License） | ふつうは触らない |
 | `tools/map-editor.html` | 配置図エディタ（PCのブラウザで開く） | 配置図が変わったとき |
 | `tools/gmail-to-discord.gs` | 問い合わせメールを Discord に通知する（Google Apps Script） | 最初の設定だけ |
@@ -108,6 +110,40 @@
 - サークル名が長いときは、文字を小さくして最大4行まで。入りきらない分は「…」になります
 - 「非公開」にすると次の更新で出展者のページは消えますが、X などは一度作ったプレビューをしばらく残します。削除依頼にはそのことも伝えてください
 - 独自ドメインにしたら、`config.json` の `site.url` を新しいURLに書き換えます（空にするとプレビュー画像は作られません）
+
+## アクセス解析（Cloudflare）
+
+同意した来場者だけ、どの出展者の詳細・写真が何回開かれたか、お気に入り・共有の回数などを数えます。数字は運営の中だけで見て、各出展者には自分の分だけを渡します（順位は出しません）。
+
+- 数えた回数はスマホの中にためておき、画面を閉じたとき（ホーム画面に戻る・アプリの切り替えなども含む）に、前回から30分以上たっていればまとめて送ります
+- 名前・連絡先・位置情報・検索した言葉・端末を見分ける番号は送りません。IP アドレスも保存しません
+- `config.json` の `analytics.endpoint` が空のあいだは、計測も同意のお知らせも出ません
+- 同意のお知らせはサイトをはじめて開いたときに出ます。「？」から同意の変更と「データの取り扱いについて」（規約）が見られます。規約の文は `src/app.js` の `POLICY`
+
+### 設定のしかた（初回だけ・15分）
+`kua.stuhub@gmail.com` で https://dash.cloudflare.com/sign-up からアカウントを作り（無料）、画面で次のように進めます。画面の名前は変わることがあります。
+
+1. **データベースを作る**：左の「Storage & Databases」→「D1」→「Create」。名前は `butsuhan-analytics`
+2. **表を作る**：できたデータベースの「Console」に `worker/schema.sql` の中身を貼って「Execute」
+3. **受け取り口を作る**：左の「Workers & Pages」→「Create」→「Create Worker」。名前は `butsuhan-analytics` →「Deploy」→「Edit code」で中身を消して `worker/analytics.js` を貼り付け →「Deploy」
+4. **データベースをつなぐ**：その Worker の「Settings」→「Bindings」→「Add」→「D1 database」。Variable name は `DB`、データベースは 1 で作ったもの
+5. **設定値を入れる**：「Settings」→「Variables and Secrets」→「Add」
+   - `SITE_ORIGIN`（Text）：`https://kua-stuhub.github.io`
+   - `EXPORT_TOKEN`（Secret）：集計を取り出すときの合言葉（長めの英数字。共有パスワード管理アプリに保存）
+6. Worker の URL（`https://butsuhan-analytics.〇〇.workers.dev`）をコピーして、`config.json` の `analytics.endpoint` に書いて push
+
+> ⚠ EXPORT_TOKEN はパスワードと同じです。コードやチャットに書かないでください。
+
+### 集計を見る
+1. ブラウザで `<Workers のURL>/export?token=<EXPORT_TOKEN>` を開くと、合計の数字が出ます。`export.json` として保存
+2. 公開サイトの `data.json` を保存して `node tools/analytics-report.mjs export.json data.json > report.csv` を実行すると、出展者ごとの表になります
+
+### 無料枠
+Workers は1日10万リクエスト、D1 は1日10万行の書き込みまで無料です（日本時間の朝9時に戻る）。1回の送信が1リクエスト・1行なので、1.5万人が同意しても1日数万件の見込みです。超えた場合はその日の送信が失敗するだけで、サイトは普通に見られ、数字はスマホに残って次の機会に送られます。
+
+### イベントが終わったら
+- `report.csv` を作って出展者に渡したら、2026年12月31日までに D1 の `batches` を削除する（規約で約束している）。合計の数字は StuArchive の記録に残す
+- 来年も使うなら Worker はそのまま。使わないなら `analytics.endpoint` を空にする
 
 ## 配置図を直す・作る（配置図エディタ）
 
