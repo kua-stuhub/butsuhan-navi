@@ -537,7 +537,7 @@ function showConsent() {
   d.innerHTML = `<div class="consent-scrim"></div><section class="consent-card" role="dialog" aria-modal="true" aria-labelledby="cs-t" tabindex="-1">
     <h2 id="cs-t">出展者支援のためのご協力のお願い</h2>
     <p>本サイトでは、各お品書きの閲覧回数やお気に入り登録数を集計し、イベント終了後に出展者の皆さまへお届けしています。今後の制作・頒布活動の参考としていただくためのものです。氏名・連絡先・位置情報など、個人を特定できる情報は取得いたしません。</p>
-    <div class="consent-btns"><button type="button" class="btn" data-consent="yes">協力する</button><button type="button" class="btn alt" data-consent="no">協力しない</button></div>
+    <div class="consent-btns"><button type="button" class="btn alt" data-consent="no">協力しない</button><button type="button" class="btn" data-consent="yes">協力する</button></div>
     <p class="consent-note">ご協力いただけない場合も、本サイトの機能はすべてご利用いただけます。設定は「？」メニューからいつでも変更できます。<br><button type="button" class="linkish" data-consent-more>データの取り扱いについて</button></p>
   </section>`;
   document.body.appendChild(d);
