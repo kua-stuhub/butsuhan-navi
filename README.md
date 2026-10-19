@@ -138,14 +138,16 @@
 > ⚠ EXPORT_TOKEN はパスワードと同じです。コードやチャットに書かないでください。
 
 ### 集計を見る
-1. ブラウザで `<Workers のURL>/export?token=<EXPORT_TOKEN>` を開くと、合計の数字が出ます。`export.json` として保存
-2. 公開サイトの `data.json` を保存して `node tools/analytics-report.mjs export.json data.json > report.csv` を実行すると、出展者ごとの表になります
+- ブラウザで `<Workers のURL>/dashboard` を開き、合言葉（`EXPORT_TOKEN`）を入れると、日別・時間帯・出展者ごとの数字がグラフと表で見られます。スマホでも見られます。合言葉はその端末のブラウザにだけ保存され、「合言葉を消す」で消せます
+- 同じページの「CSVで保存」で、出展者に渡す用の表（全体の中央値との比つき、順位なし）が保存できます
+- コマンドで作る場合：`<Workers のURL>/export?token=<EXPORT_TOKEN>` を `export.json`、公開サイトの `data.json` を保存して `node tools/analytics-report.mjs export.json data.json > report.csv`
+- Worker のコード（`worker/analytics.js`）を変えたら、Cloudflare の画面の「Edit code」で中身を貼り替えて「Deploy」し直します
 
 ### 無料枠
 Workers は1日10万リクエスト、D1 は1日10万行の書き込みまで無料です（日本時間の朝9時に戻る）。1回の送信が1リクエスト・1行なので、1.5万人が同意しても1日数万件の見込みです。超えた場合はその日の送信が失敗するだけで、サイトは普通に見られ、数字はスマホに残って次の機会に送られます。
 
 ### イベントが終わったら
-- `report.csv` を作って出展者に渡したら、2026年12月31日までに D1 の `batches` を削除する（規約で約束している）。合計の数字は StuArchive の記録に残す
+- 出展者ごとの CSV を作って出展者に渡したら、2026年12月31日までに D1 の `batches` を削除する（規約で約束している）。合計の数字は StuArchive の記録に残す
 - 来年も使うなら Worker はそのまま。使わないなら `analytics.endpoint` を空にする
 
 ## 配置図を直す・作る（配置図エディタ）
