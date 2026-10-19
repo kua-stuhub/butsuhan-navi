@@ -7,6 +7,10 @@
     "url": "https://www.notion.so/3f8d14f8ecf581b8b238e44bb23b4415",
     "email": "kua.stuhub@gmail.com"
   },
+  "site": {
+    "_説明": "公開サイトのURL（最後は /）。共有したときのプレビュー画像（OGP）に使う。独自ドメインにしたらここを書き換える。空にするとプレビュー画像を作らない。",
+    "url": "https://kua-stuhub.github.io/butsuhan-navi/"
+  },
   "event": {
     "name": "大瓜生山祭",
     "year": 2026,
