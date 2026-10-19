@@ -21,7 +21,7 @@
   },
   "analytics": {
     "_説明": "アクセス解析の送り先（Cloudflare Workers のURL）。空のあいだは計測も同意モーダルも出ない。設定は README「アクセス解析」を参照。",
-    "endpoint": ""
+    "endpoint": "https://butsuhan-analytics.kua-stuhub.workers.dev/"
   },
   "contact": {
     "_説明": "掲載の修正・削除の窓口。email はそのまま文字で表示する。X などのURLが決まったら url と label を入れる。",
