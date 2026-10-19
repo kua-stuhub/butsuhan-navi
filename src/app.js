@@ -535,10 +535,10 @@ function showConsent() {
   const d = document.createElement("div");
   d.className = "consent";
   d.innerHTML = `<div class="consent-scrim"></div><section class="consent-card" role="dialog" aria-modal="true" aria-labelledby="cs-t" tabindex="-1">
-    <h2 id="cs-t">アクセス解析に関するお知らせ</h2>
-    <p>本サイトでは、サービスの改善および掲載者へのフィードバックを目的として、閲覧状況に関する統計情報を取得します。取得する情報には、氏名・連絡先・位置情報等の個人を特定できる情報は含まれません。詳しくは「データの取り扱いについて」をご確認ください。</p>
-    <div class="consent-btns"><button type="button" class="btn" data-consent="yes">同意する</button><button type="button" class="btn alt" data-consent="no">同意しない</button></div>
-    <p class="consent-note">※同意しない場合も、本サイトの機能はすべてご利用いただけます。設定は「？」メニューからいつでも変更できます。<br><button type="button" class="linkish" data-consent-more>データの取り扱いについて</button></p>
+    <h2 id="cs-t">出展者のための、協力のお願い</h2>
+    <p>どのお品書きが何回見られたか、お気に入りされたかを数えて、イベントのあとに出展者のみなさんへお届けします。次の作品づくりや頒布の参考にしてもらうためです。名前・連絡先・位置情報など、あなたを特定できる情報は集めません。</p>
+    <div class="consent-btns"><button type="button" class="btn" data-consent="yes">協力する</button><button type="button" class="btn alt" data-consent="no">協力しない</button></div>
+    <p class="consent-note">協力しなくても、サイトはすべての機能を使えます。あとから「？」でいつでも変えられます。<br><button type="button" class="linkish" data-consent-more>データの取り扱いについて</button></p>
   </section>`;
   document.body.appendChild(d);
   requestAnimationFrame(() => requestAnimationFrame(() => d.classList.add("open")));
@@ -582,8 +582,8 @@ function renderHelp() {
     </div>
     ${AN.url ? `<h3 id="policy">データの取り扱い</h3>
     <div class="help-contact">
-      <p>アクセス解析：<b>${AN.on ? "同意しています" : "同意していません"}</b></p>
-      <button type="button" class="btn alt" data-consent="${AN.on ? "no" : "yes"}">${AN.on ? "同意をやめる" : "同意する"}</button>
+      <p>出展者のためのデータ集め：<b>${AN.on ? "協力しています" : "協力していません"}</b></p>
+      <button type="button" class="btn alt" data-consent="${AN.on ? "no" : "yes"}">${AN.on ? "協力をやめる" : "協力する"}</button>
       <details class="policy" id="policyText"><summary>データの取り扱いについて</summary>${POLICY}</details>
     </div>` : ""}
     ${form ? `<h3>出展者の方へ</h3><a class="help-form" href="${esc(safeUrl(form))}" target="_blank" rel="noopener">掲載フォームを開く ›</a>` : ""}
