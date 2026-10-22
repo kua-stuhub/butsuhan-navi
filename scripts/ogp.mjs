@@ -11,8 +11,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 
-const W = 1200, H = 630, SPLIT = 610;           // 左 0〜610 が文字、右 610〜1200 が地図
-const TX = 64, TW = SPLIT - TX - 48;             // 文字の左端と最大幅
+const W = 1200, H = 630, SPLIT = 680;           // 左 0〜680 が文字、右 680〜1200 が地図
+const TX = 56, TW = SPLIT - TX - 40;             // 文字の左端と最大幅
 const C = { panel: "#F4F5F6", mapBg: "#D7D9DD", floor: "#E5E7EA", wall: "#8E939A", top: "#F4F5F6", side: "#C3C7CC", side2: "#AEB3B9", stroke: "#7D838B", fg: "#1F1E1C", muted: "#6B6E73", line: "#D3D6DA", accent: "#C8553D" };
 const hash = (s) => crypto.createHash("sha1").update(s).digest("hex").slice(0, 12);
 
@@ -44,7 +44,7 @@ function wrap(font, s, size, maxW) {
   return lines;
 }
 function fitName(s, maxW, maxH) {
-  for (const [size, maxLines] of [[76, 1], [64, 2], [54, 2], [46, 3], [40, 3], [34, 4]]) {
+  for (const [size, maxLines] of [[88, 1], [76, 1], [64, 2], [54, 2], [46, 3], [40, 3], [34, 4]]) {
     const lines = wrap(JP_B, s, size, maxW), lh = size * 1.28;
     if (lines.length <= maxLines && lines.length * lh <= maxH) return { size, lines, lh };
   }
@@ -113,16 +113,17 @@ function frame(L, booth, body, cfg) {
   s += `<defs><clipPath id="m"><rect x="${SPLIT}" y="0" width="${W - SPLIT}" height="${H}"/></clipPath></defs><g clip-path="url(#m)">${mapSvg(L, booth)}</g>`;
   s += `<rect width="${SPLIT}" height="${H}" fill="${C.panel}"/><rect x="${SPLIT}" width="2" height="${H}" fill="${C.line}"/>`;
   // ヘッダー：「大瓜生山祭 [2026] 物販ナビ（非公式）」
-  s += text(JP_M, ev.name, TX, 84, 26, C.fg);
-  let hx = TX + adv(JP_M, ev.name, 26) + 8;
-  s += `<rect x="${hx.toFixed(1)}" y="60" width="${(adv(NUM, year, 24) + 14).toFixed(1)}" height="32" rx="5" fill="${C.fg}"/>` + text(NUM, year, hx + 7, 84, 24, C.panel);
-  hx += adv(NUM, year, 24) + 22;
-  s += text(JP_M, "物販ナビ", hx, 84, 26, C.fg) + text(JP_M, "（非公式）", hx + adv(JP_M, "物販ナビ", 26) + 4, 84, 18, C.muted);
+  // スマホでは画像が小さく表示されるので、文字は大きめにする
+  s += text(JP_B, ev.name, TX, 92, 36, C.fg);
+  let hx = TX + adv(JP_B, ev.name, 36) + 10;
+  s += `<rect x="${hx.toFixed(1)}" y="58" width="${(adv(NUM, year, 34) + 18).toFixed(1)}" height="44" rx="7" fill="${C.fg}"/>` + text(NUM, year, hx + 9, 92, 34, C.panel);
+  hx += adv(NUM, year, 34) + 30;
+  s += text(JP_B, "物販ナビ", hx, 92, 36, C.fg) + text(JP_M, "（非公式）", hx + adv(JP_B, "物販ナビ", 36) + 2, 92, 22, C.muted);
   s += body;
   // フッター：日程と運営
   const org = cfg.org?.name ? `運営：${cfg.org.name}` : "";
-  s += text(NUM, String(ev.dates || ""), TX, 585, 22, C.muted);
-  if (org) s += text(JP_M, org, TX + TW - adv(JP_M, org, 16), 584, 16, C.muted);
+  s += text(NUM, String(ev.dates || ""), TX, 594, 30, C.muted);
+  if (org) { let os = 22; while (os > 16 && adv(JP_M, org, os) > TW - adv(NUM, String(ev.dates || ""), 30) - 24) os -= 2; s += text(JP_M, org, TX + TW - adv(JP_M, org, os), 592, os, C.muted); }
   return s + "</svg>";
 }
 
@@ -130,28 +131,30 @@ function exhibitorCard(L, e, cfg) {
   const booth = L.booths.find((b) => String(b[0]) === e.space), room = booth && roomAt(L, booth);
   let s = "";
   // スペース番号と部屋
-  const noY = 206, no = e.space || "—";
-  s += text(NUM, "SPACE", TX + 2, noY - 58, 18, C.muted) + text(NUM, no, TX, noY, 62, C.accent);
+  const noY = 236, no = e.space || "—";
+  s += text(NUM, "SPACE", TX + 2, noY - 86, 24, C.muted) + text(NUM, no, TX, noY, 96, C.accent);
   if (room) {
-    const rx = TX + adv(NUM, no, 62) + 22, avail = TX + TW - rx;
-    let size = 26; while (size > 16 && adv(JP_M, room.name, size) > avail) size -= 2;
-    s += text(JP_M, adv(JP_M, room.name, size) > avail ? (room.short || room.name) : room.name, rx, noY - 4, size, C.fg);
+    const rx = TX + adv(NUM, no, 96) + 26, avail = TX + TW - rx;
+    let label = room.name, size = 36;
+    while (size > 22 && adv(JP_B, label, size) > avail) size -= 2;
+    if (adv(JP_B, label, size) > avail && room.short) { label = room.short; size = 36; while (size > 22 && adv(JP_B, label, size) > avail) size -= 2; }
+    s += text(JP_B, label, rx, noY - 8, size, C.fg);
   }
-  // サークル名（y 236〜470 の中）
-  const top = 236, nm = fitName(e.name, TW, 470 - top);
+  // サークル名（y 262〜452 の中）
+  const top = 262, nm = fitName(e.name, TW, 452 - top);
   nm.lines.forEach((ln, i) => (s += text(JP_B, ln, TX, top + nm.size + i * nm.lh, nm.size, C.fg)));
   // 頒布物：1行に入る分だけ。残りは「+N」
   const tags = (e.tags || []).map((t) => t.replace("（陶芸・木工など）", "").replace("などのアート作品", ""));
-  let tx = TX; const ty = 500, fs = 20;
+  let tx = TX; const ty = 470, fs = 28, th = 52, pad = 20;
   for (let i = 0; i < tags.length; i++) {
-    const w = adv(JP_M, tags[i], fs) + 28, rest = tags.length - i - 1, more = rest ? adv(NUM, `+${rest}`, fs) + 36 : 0;
+    const w = adv(JP_M, tags[i], fs) + pad * 2, rest = tags.length - i - 1, more = rest ? adv(NUM, `+${rest}`, fs) + pad * 2 + 10 : 0;
     if (tx + w + more > TX + TW) {
       const m = `+${tags.length - i}`;
-      s += `<rect x="${tx.toFixed(1)}" y="${ty}" width="${(adv(NUM, m, fs) + 28).toFixed(1)}" height="38" rx="19" fill="none" stroke="${C.muted}" stroke-width="1.5"/>` + text(NUM, m, tx + 14, ty + 26, fs, C.muted);
+      s += `<rect x="${tx.toFixed(1)}" y="${ty}" width="${(adv(NUM, m, fs) + pad * 2).toFixed(1)}" height="${th}" rx="${th / 2}" fill="none" stroke="${C.muted}" stroke-width="2"/>` + text(NUM, m, tx + pad, ty + 36, fs, C.muted);
       break;
     }
-    s += `<rect x="${tx.toFixed(1)}" y="${ty}" width="${w.toFixed(1)}" height="38" rx="19" fill="#fff" stroke="${C.line}" stroke-width="1.5"/>` + text(JP_M, tags[i], tx + 14, ty + 26, fs, C.fg);
-    tx += w + 8;
+    s += `<rect x="${tx.toFixed(1)}" y="${ty}" width="${w.toFixed(1)}" height="${th}" rx="${th / 2}" fill="#fff" stroke="${C.line}" stroke-width="2"/>` + text(JP_M, tags[i], tx + pad, ty + 36, fs, C.fg);
+    tx += w + 10;
   }
   return frame(L, booth, s, cfg);
 }
