@@ -1,7 +1,7 @@
 // 共有用のプレビュー画像（OGP、1200×630）を作る
 //
 // - 出展者ごと：左に「スペース番号・部屋・サークル名・頒布物」、右に会場の立体地図（そのブースを朱色＋ピン）
-// - サイト全体：左にサイト名と説明、右に会場全体の地図
+// - サイト全体：左にサイト名とできること（4つ）、右に会場全体の地図（切らずに全部見せる。部屋名つき）
 // 文字と地図は左右の欄で分けていて、地図は右の欄からはみ出した分を切るので重ならない。
 // 長いサークル名は、行数が増えるごとに文字を小さくして最大4行。それでも入らなければ末尾を「…」にする。
 // 文字は opentype.js で図形（パス）にしてから描くので、ビルド環境にフォントを入れなくても同じ見た目になる。
@@ -63,7 +63,8 @@ const quad = (x1, y1, x2, y2, z) => [P(x1, y1, z), P(x2, y1, z), P(x2, y2, z), P
 const center = (b) => [(b[1] + b[2]) / 2, (b[3] + b[4]) / 2];
 const roomAt = (L, b) => { const [cx, cy] = center(b); return L.rooms.find((r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h); };
 
-function mapSvg(L, booth) {
+// area：地図を描く欄（左端 x と幅 w）。labels：部屋名を床の上に出す（会場全体のときだけ使う）
+function mapSvg(L, booth, area = { x: SPLIT, w: W - SPLIT }, labels = false) {
   const Z = 9, WALL = 14, sel = booth ? String(booth[0]) : null;
   // 見せる範囲：ブースがあればその部屋（横に長い部屋はブースの周りだけ）、なければ会場全体
   let fr;
@@ -75,14 +76,16 @@ function mapSvg(L, booth) {
     const all = L.rooms.concat(L.paths || []), xs = all.flatMap((r) => [r.x, r.x + r.w]), ys = all.flatMap((r) => [r.y, r.y + r.h]);
     fr = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
   }
+  // 斜めから見るので、会場全体は外枠の四隅ではなく、部屋と通路それぞれの四隅で大きさを測る（余白が出ないように）
   let mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9;
-  [[fr.x, fr.y], [fr.x + fr.w, fr.y], [fr.x, fr.y + fr.h], [fr.x + fr.w, fr.y + fr.h]].forEach(([x, y]) => [0, WALL].forEach((z) => {
+  const rects = booth ? [fr] : L.rooms.concat(L.paths || []);
+  rects.flatMap((r) => [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]]).forEach(([x, y]) => [0, WALL].forEach((z) => {
     const [a, c] = P(x, y, z); mnx = Math.min(mnx, a); mxx = Math.max(mxx, a); mny = Math.min(mny, c); mxy = Math.max(mxy, c);
   }));
-  const areaW = W - SPLIT, padX = booth ? 56 : 40, padY = booth ? 90 : 60;
-  // 会場全体は横に長くて小さくなるので、左右は少し切れてもよいことにして大きく見せる
-  const s = Math.min((areaW - padX * 2) / (mxx - mnx) * (booth ? 1 : 1.7), (H - padY * 2) / (mxy - mny));
-  const ox = SPLIT + areaW / 2 - s * (mnx + mxx) / 2, oy = H / 2 - s * (mny + mxy) / 2 + (booth ? 14 : 0);
+  // 会場全体は欄にまるごと収める（端を切らない）
+  const areaW = area.w, padX = booth ? 56 : 28, padY = booth ? 90 : 60;
+  const s = Math.min((areaW - padX * 2) / (mxx - mnx), (H - padY * 2) / (mxy - mny));
+  const ox = area.x + areaW / 2 - s * (mnx + mxx) / 2, oy = H / 2 - s * (mny + mxy) / 2 + (booth ? 14 : 0);
   const sw = (w) => `vector-effect="non-scaling-stroke" stroke-width="${w}"`;
   let g = "";
   // 壁（walls）があれば、部屋と通路を1つの床にして、壁は配置図の線のとおりに立てる（サイトの地図と同じ）
@@ -113,6 +116,12 @@ function mapSvg(L, booth) {
     g += [a, b, d].map((p) => `<line stroke="${C.wall}" ${sw(1.2)} x1="${dn(p)[0].toFixed(1)}" y1="${dn(p)[1].toFixed(1)}" x2="${up(p)[0].toFixed(1)}" y2="${up(p)[1].toFixed(1)}"/>`).join("");
   }
   let out = `<g transform="translate(${ox.toFixed(1)},${oy.toFixed(1)}) scale(${s.toFixed(4)})">${g}</g>`;
+  if (labels) for (const r of L.rooms) {
+    if (!/^[A-Za-z]*\d+$/.test(r.name)) continue; // 「廊下」などは出さない。位置はサイトの地図と同じ（lx, ly）
+    const [px, py] = P(r.lx ?? r.x + r.w / 2, r.ly ?? r.y + r.h / 2, 0), fs = 19, X = ox + px * s - adv(NUM, r.name, fs) / 2, Y = oy + py * s + fs * .35;
+    const d = NUM.getPath(r.name, X, Y, fs).toPathData(1);
+    out += `<path d="${d}" fill="none" stroke="${C.floor}" stroke-width="5" stroke-linejoin="round"/><path d="${d}" fill="${C.label}"/>`;
+  }
   if (booth) {
     const [px, py] = P(...center(booth), Z), X = ox + px * s, Y = oy + py * s;
     out += `<path d="M${X.toFixed(1)} ${(Y - 6).toFixed(1)} c-6 -14 -22 -24 -22 -40 a22 22 0 0 1 44 0 c0 16 -16 26 -22 40z" fill="${C.accent}" stroke="#fff" stroke-width="3"/><circle cx="${X.toFixed(1)}" cy="${(Y - 46).toFixed(1)}" r="8" fill="#fff"/>`;
@@ -173,11 +182,41 @@ function exhibitorCard(L, e, cfg) {
   return frame(L, booth, s, cfg);
 }
 
+// サイト全体：左に「何ができるか」、右に会場全体の地図（端まで切らずに収める）
+const SITE_SPLIT = 470;
+const ICON = {
+  map: "M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z M12 12.4a2.4 2.4 0 1 0 0-4.8 2.4 2.4 0 0 0 0 4.8z",
+  tag: "M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1.4 1.4 0 0 1 0 2l-6.1 6.1a1.4 1.4 0 0 1-2 0z M8.2 9.2a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
+  star: "M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z",
+  menu: "M5 3.5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z M8 8.5h8 M8 12.5h8 M8 16.5h5",
+};
 function siteCard(L, cfg) {
-  let s = text(JP_B, "物販ナビ", TX, 250, 84, C.fg);
-  const desc = wrap(JP_M, "有志物販に出展するサークル・作家のお品書きを、会場の地図といっしょに探せます。", 28, TW);
-  desc.slice(0, 4).forEach((ln, i) => (s += text(JP_M, ln, TX, 330 + i * 44, 28, C.muted)));
-  return frame(L, null, s, cfg);
+  const ev = cfg.event, year = String(ev.year), tx = 52, tw = SITE_SPLIT - tx - 36;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="${C.mapBg}"/>`;
+  s += `<defs><clipPath id="m"><rect x="${SITE_SPLIT}" y="0" width="${W - SITE_SPLIT}" height="${H}"/></clipPath></defs><g clip-path="url(#m)">${mapSvg(L, null, { x: SITE_SPLIT, w: W - SITE_SPLIT }, true)}</g>`;
+  s += `<rect width="${SITE_SPLIT}" height="${H}" fill="${C.panel}"/><rect x="${SITE_SPLIT}" width="2" height="${H}" fill="${C.line}"/>`;
+  // 地図の左上に「全○スペース」
+  const n = L.booths.filter((b) => /^\d+$/.test(String(b[0]))).length, cap = `全${n}スペース`, cw = adv(JP_B, cap, 24) + 36;
+  s += `<rect x="${SITE_SPLIT + 30}" y="34" width="${cw.toFixed(1)}" height="46" rx="23" fill="${C.panel}" stroke="${C.line}" stroke-width="2"/>` + text(JP_B, cap, SITE_SPLIT + 48, 66, 24, C.label);
+  // 見出し：「大瓜生山祭 [2026]」の下に大きく「物販ナビ」
+  s += text(JP_B, ev.name, tx, 84, 32, C.fg);
+  const hx = tx + adv(JP_B, ev.name, 32) + 10;
+  s += `<rect x="${hx.toFixed(1)}" y="53" width="${(adv(NUM, year, 30) + 16).toFixed(1)}" height="40" rx="7" fill="#3E405C"/>` + text(NUM, year, hx + 8, 84, 30, C.panel);
+  s += text(JP_B, "物販ナビ", tx - 3, 172, 74, C.fg) + text(JP_M, "（非公式）", tx + adv(JP_B, "物販ナビ", 74) - 2, 170, 22, C.muted);
+  // できること（スマホで小さく見えても読める大きさにする）
+  const feats = [["map", "地図でスペースを探す"], ["tag", "頒布物で絞り込む"], ["star", "お気に入りを地図に表示"], ["menu", "お品書き画像を見る"]];
+  feats.forEach(([ic, label], i) => {
+    const y = 226 + i * 76, r = 26, cx = tx + r, cy = y + r;
+    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${ic === "star" ? "#F3C24B" : C.accent}"/>`;
+    s += `<path d="${ICON[ic]}" transform="translate(${cx - 15} ${cy - 15}) scale(1.25)" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>`;
+    let fs = 30; while (fs > 22 && adv(JP_B, label, fs) > tw - r * 2 - 18) fs -= 2;
+    s += text(JP_B, label, tx + r * 2 + 18, cy + fs * .36, fs, C.fg);
+  });
+  // フッター：日程と運営
+  s += text(NUM, String(ev.dates || ""), tx, 594, 30, C.muted);
+  const org = cfg.org?.shortName || cfg.org?.name || "";
+  if (org) { let os = 20; const avail = tw - adv(NUM, String(ev.dates || ""), 30) - 20; while (os > 14 && adv(JP_M, "運営：" + org, os) > avail) os -= 2; s += text(JP_M, "運営：" + org, tx + tw - adv(JP_M, "運営：" + org, os), 592, os, C.muted); }
+  return s + "</svg>";
 }
 
 /* ---------- まとめて書き出す ---------- */
