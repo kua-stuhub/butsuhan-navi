@@ -13,8 +13,7 @@ import crypto from "node:crypto";
 
 const W = 1200, H = 630, SPLIT = 680;           // 左 0〜680 が文字、右 680〜1200 が地図
 const TX = 56, TW = SPLIT - TX - 40;             // 文字の左端と最大幅
-// 色は2026年の配置図（ベージュの床・紺の壁・朱の枠の机・青い目印）に合わせる。サイトの地図（src/style.css の --map-*）と同じ値
-const C = { panel: "#F3EFE7", mapBg: "#D6CFC1", path: "#DFD9CD", floor: "#E8E3D9", wall: "#2A2C48", top: "#EBCFC2", side: "#D3AE9E", side2: "#C29B8A", stroke: "#A32C2E", marker: "#DCEBF8", markerStroke: "#30599F", fg: "#1F1E1C", muted: "#6E6A62", line: "#D9D2C4", accent: "#C8553D" };
+const C = { panel: "#F4F5F6", mapBg: "#D7D9DD", path: "#DEE0E3", floor: "#E5E7EA", wall: "#8E939A", top: "#F4F5F6", side: "#C3C7CC", side2: "#AEB3B9", stroke: "#7D838B", marker: "#D3D6DA", markerStroke: "#7D838B", fg: "#1F1E1C", muted: "#6B6E73", line: "#D3D6DA", accent: "#C8553D" };
 const hash = (s) => crypto.createHash("sha1").update(s).digest("hex").slice(0, 12);
 
 /* ---------- 文字 ---------- */
@@ -119,7 +118,7 @@ function frame(L, booth, body, cfg) {
   // スマホでは画像が小さく表示されるので、文字は大きめにする
   s += text(JP_B, ev.name, TX, 92, 36, C.fg);
   let hx = TX + adv(JP_B, ev.name, 36) + 10;
-  s += `<rect x="${hx.toFixed(1)}" y="58" width="${(adv(NUM, year, 34) + 18).toFixed(1)}" height="44" rx="7" fill="${C.wall}"/>` + text(NUM, year, hx + 9, 92, 34, C.panel);
+  s += `<rect x="${hx.toFixed(1)}" y="58" width="${(adv(NUM, year, 34) + 18).toFixed(1)}" height="44" rx="7" fill="${C.fg}"/>` + text(NUM, year, hx + 9, 92, 34, C.panel);
   hx += adv(NUM, year, 34) + 30;
   s += text(JP_B, "物販ナビ", hx, 92, 36, C.fg) + text(JP_M, "（非公式）", hx + adv(JP_B, "物販ナビ", 36) + 2, 92, 22, C.muted);
   s += body;
