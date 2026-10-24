@@ -3,18 +3,18 @@
 :root{
   --bg:#ECEDEF; --surface:#F4F5F6; --card:#FFFFFF; --fg:#1F1E1C; --muted:#6B6E73; --line:#D3D6DA;
   /* 地図は2026年の配置図（ベージュの床・紺の壁・朱の枠の机）に色を合わせる。画面のほかの部分はグレーのまま */
-  --map-bg:#D6CFC1; --map-path:#DFD9CD; --map-floor:#E8E3D9; --map-wall:#2A2C48; --booth-top:#EBCFC2; --booth-side:#D3AE9E; --booth-side2:#C29B8A; --booth-stroke:#A32C2E; --marker:#DCEBF8; --marker-stroke:#30599F;
+  --map-bg:#D9D3C7; --map-path:#DDD7CC; --map-floor:#EBE7DF; --map-wall:#6F7290; --map-label:#3E405C; --booth-top:#F0DDD4; --booth-side:#DFC0B3; --booth-side2:#D2AE9F; --booth-stroke:#BE7F74; --marker:#DCEBF8; --marker-stroke:#30599F;
   --accent:#C8553D; --accent-ink:#FFFFFF; --fav:#D9A21B;
   --f-body:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Yu Gothic","Meiryo",sans-serif;
   --f-mono:"Barlow","Helvetica Neue",Arial,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#17181A; --surface:#1E2022; --card:#232528; --fg:#ECEBE8; --muted:#9CA0A6; --line:#3A3D41;
-  --map-bg:#16172A; --map-path:#1C1D33; --map-floor:#22243C; --map-wall:#8E92B8; --booth-top:#5C3A36; --booth-side:#4A2E2B; --booth-side2:#3D2624; --booth-stroke:#D0706B; --marker:#22344F; --marker-stroke:#7EA2DB;
+  --map-bg:#17182A; --map-path:#1A1B2E; --map-floor:#222439; --map-wall:#6A6E92; --map-label:#B9BCD8; --booth-top:#4E3633; --booth-side:#3F2C2A; --booth-side2:#352523; --booth-stroke:#A0645E; --marker:#22344F; --marker-stroke:#7EA2DB;
   --accent:#E07257; --accent-ink:#1A0E0A; --fav:#E8B53A; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#17181A; --surface:#1E2022; --card:#232528; --fg:#ECEBE8; --muted:#9CA0A6; --line:#3A3D41;
-  --map-bg:#16172A; --map-path:#1C1D33; --map-floor:#22243C; --map-wall:#8E92B8; --booth-top:#5C3A36; --booth-side:#4A2E2B; --booth-side2:#3D2624; --booth-stroke:#D0706B; --marker:#22344F; --marker-stroke:#7EA2DB;
+  --map-bg:#17182A; --map-path:#1A1B2E; --map-floor:#222439; --map-wall:#6A6E92; --map-label:#B9BCD8; --booth-top:#4E3633; --booth-side:#3F2C2A; --booth-side2:#352523; --booth-stroke:#A0645E; --marker:#22344F; --marker-stroke:#7EA2DB;
   --accent:#E07257; --accent-ink:#1A0E0A; --fav:#E8B53A; color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -56,7 +56,7 @@ a.byline:hover svg{opacity:1}
 .path-floor{fill:var(--map-path)}
 .room-floor{fill:var(--map-floor);stroke:var(--map-wall);stroke-width:1.2}
 .room-wall{fill:none;stroke:var(--map-wall);stroke-width:1.2}
-.room-label{font-family:var(--f-mono);font-weight:600;fill:var(--map-wall);letter-spacing:.06em}
+.room-label{font-family:var(--f-mono);font-weight:600;fill:var(--map-label);stroke:var(--map-floor);stroke-width:4px;stroke-linejoin:round;paint-order:stroke;letter-spacing:.06em}
 .booth .t{fill:var(--booth-top);stroke:var(--booth-stroke);stroke-width:.8}
 .booth .s1{fill:var(--booth-side);stroke:var(--booth-stroke);stroke-width:.8}
 .booth .s2{fill:var(--booth-side2);stroke:var(--booth-stroke);stroke-width:.8}
