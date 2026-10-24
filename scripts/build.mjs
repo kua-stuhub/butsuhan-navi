@@ -169,6 +169,7 @@ async function fromNotion(token, dbId) {
   } while (cursor);
 
   const text = (p) => p?.select ? p.select.name : (p?.title || p?.rich_text || []).map((t) => t.plain_text).join("");
+  const fixedTags = new Set(cfg.categories.flatMap((c) => c.tags));
   const multi = (p) => (p?.multi_select || []).map((o) => o.name);
   const files = (p) => (p?.files || []).map((f) => ({ url: f.file?.url || f.external?.url, name: f.name || "" })).filter((f) => f.url);
 
@@ -181,7 +182,8 @@ async function fromNotion(token, dbId) {
     const picked = rawSpace.match(/^\s*([0-9０-９]+)[\s　]+(.+?)\s*$/);
     const name = clip(text(pr[P.name]).trim() || (picked ? picked[2] : ""), 60);
     if (!name) { warn(`サークル名が空の行をスキップしました (${pg.url})`); continue; }
-    const tags = [...new Set(P.tags.flatMap((k) => multi(pr[k])))];
+    // 「その他」の自由入力は「スクイーズ、ミニアルバム」のように1つにまとまって届くので、区切りで分ける
+    const tags = [...new Set(P.tags.flatMap((k) => multi(pr[k])).flatMap((t) => fixedTags.has(t) ? [t] : t.split(/[、,，/／\s　]+/)).filter(Boolean))];
     const imgs = files(pr[P.images]).slice(0, 5);
     const images = (await pool(imgs, 4, async (f, i) => {
       const key = hash(`${pg.id}|${i}|${f.name}|${pg.last_edited_time}`);
