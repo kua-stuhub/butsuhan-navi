@@ -253,6 +253,16 @@ const layoutJson = JSON.parse(await fs.readFile(path.join(ROOT, "data", "layout.
 const onMap = new Set(layoutJson.booths.map((b) => normalizeSpace(b[0])));
 for (const e of exhibitors) if (e.space && !onMap.has(e.space)) warn(`「${e.name}」のスペース ${e.space} は配置図にありません（地図に出ません）`);
 
+// 配置図の出展者リスト（data/roster.json）。読み取りが確定した名前（check なし・〓なし）だけ、未掲載のスペースに出す
+// 本番データのときは、投稿の名前と配置図の名前を照合する（ダミーデータは名前が合わないので照合しない）
+let roster = {};
+try {
+  const rj = JSON.parse(await fs.readFile(path.join(ROOT, "data", "roster.json"), "utf8"));
+  for (const r of rj.entries || []) if (r.name && !r.check && !r.name.includes("〓")) roster[normalizeSpace(r.no)] = r.name;
+  const flat = (t) => String(t).normalize("NFKC").toLowerCase().replace(/[\s・、。,.!?！？「」『』（）()&＆'’]/g, "");
+  if (live) for (const e of exhibitors) { const n = roster[e.space]; if (n && !flat(e.name).includes(flat(n)) && !flat(n).includes(flat(e.name))) warn(`スペース ${e.space}：投稿の名前「${e.name}」が配置図の「${n}」と違います（番号の書き間違いかも）`); }
+} catch (err) { if (err.code !== "ENOENT") warn(`data/roster.json を読めませんでした: ${err.message}`); }
+
 // 共有用のプレビュー画像。og:image は絶対URLが必要なので、config.json の site.url が空なら作らない
 const siteUrl = String(cfg.site?.url || "").replace(/\/?$/, "/");
 const okId = (id) => /^[A-Za-z0-9_-]+$/.test(id);
@@ -272,6 +282,7 @@ const data = {
   analytics: { endpoint: cfg.analytics?.endpoint || "" },
   categories,
   exhibitors,
+  roster,
 };
 await fs.writeFile(path.join(OUT, "data.json"), JSON.stringify(data));
 await fs.copyFile(path.join(ROOT, "data", "layout.json"), path.join(OUT, "layout.json"));

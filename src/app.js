@@ -17,7 +17,7 @@ const store = {
 };
 
 /* ---------- data (filled by boot) ---------- */
-let ROOMS = [], B = [], X = [], CATS = [], DATA = null;
+let ROOMS = [], PATHS = [], B = [], X = [], CATS = [], DATA = null, ROSTER = {};
 let bySpace = {};
 const roomOf = (no) => {
   const b = B.find((b) => String(b[0]) === String(no)); if (!b) return "";
@@ -48,6 +48,12 @@ function matches(e) {
   return true;
 }
 const filtering = () => S.tags.size > 0 || S.q.trim() !== "";
+// 配置図の出展者リストにだけ名前があって、お品書きが未掲載のスペース（検索のときだけ一覧の下に出す）
+const rosterHits = () => {
+  const q = S.q.trim().normalize("NFKC").toLowerCase(); if (!q || S.scope !== "all" || S.tags.size) return [];
+  return Object.entries(ROSTER).filter(([no, name]) => !bySpace[no] && (name.normalize("NFKC").toLowerCase().includes(q) || no === q)).sort((a, b) => a[0] - b[0]);
+};
+const isMarker = (no) => !/^\d+$/.test(String(no)); // 受付・フォトブースなど、押せない目印
 const visible = () => X.filter((e) => (S.scope === "all" || favs.has(e.id)) && matches(e));
 
 const star = `<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z" stroke-linejoin="round"/></svg>`;
@@ -78,7 +84,8 @@ function renderSheet() {
     </div>
     ${oc ? `<div class="chips sub">${oc.tags.filter((t) => counts[t] || known.has(t)).map((t) => `<button type="button" class="chip" data-tag="${esc(t)}" aria-pressed="${S.tags.has(t)}">${esc(short(t))}<small>${counts[t] || 0}</small></button>`).join("")}</div>` : ""}
     <div class="grid">${list.length ? list.map(cardHTML).join("") :
-      `<div class="empty">${S.scope === "fav" && !favs.size ? "お気に入りはまだありません。<br>カードの☆を押すと、ここに集まります。<br>この端末のブラウザにだけ保存されます。" : X.length ? "条件に合う出展者はいません。<br>タグを減らすか、検索語を変えてください。" : "掲載中の出展者はまだいません。<br>掲載が始まるまでお待ちください。"}</div>`}</div>
+      rosterHits().length ? "" : `<div class="empty">${S.scope === "fav" && !favs.size ? "お気に入りはまだありません。<br>カードの☆を押すと、ここに集まります。<br>この端末のブラウザにだけ保存されます。" : X.length ? "条件に合う出展者はいません。<br>タグを減らすか、検索語を変えてください。" : "掲載中の出展者はまだいません。<br>掲載が始まるまでお待ちください。"}</div>`}</div>
+    ${rosterHits().length ? `<div class="roster"><p>お品書き未掲載（配置図より）</p>${rosterHits().map(([no, name]) => `<button type="button" class="rrow" data-goto="${esc(no)}"><b>${esc(no)}</b><span>${esc(name)}</span><small>${esc(roomOf(no))}</small></button>`).join("")}</div>` : ""}
     <p class="foot">${S.sort === "shuffle" ? "並び順は見る人ごとにシャッフルされるので、特定の出展者がいつも上に来ることはありません。<br>" : ""}${updated ? `最終更新 ${esc(updated)}<br>` : ""}${org}有志による非公式の取り組みです。大学・学園祭実行委員会・物販イベント主催とは関係ありません。掲載内容の修正・削除は${contact}までご連絡ください。</p>`;
   // 検索欄は作り直さずに残す（入力中に作り直すと、日本語の変換が壊れて文字が二重になる）
   const body = $("#sbody"), showQ = S.searchOpen || S.q;
@@ -110,9 +117,9 @@ function cardHTML(e) {
 function renderDetail() {
   const e = S.detail, n = e.images.length;
   $("#headSlot").innerHTML = `<div class="dhead"><button type="button" class="back" id="back">‹ 一覧</button><h2>${esc(e.name)}</h2></div>`;
-  if (e.vacant) { // a space nobody has listed yet
+  if (e.vacant) { // a space nobody has listed yet（配置図の名前があれば見出しに出す）
     const form = DATA?.form?.url ? `<p class="foot" style="margin-top:0">出展者の方へ：<a href="${esc(safeUrl(DATA.form.url))}" target="_blank" rel="noopener">${esc(DATA.form.label || "掲載フォーム")}</a>からお品書きを載せられます。</p>` : "";
-    $("#sbody").innerHTML = `<p class="dsum" id="dsum"><span>${esc(roomOf(e.space))}</span></p>
+    $("#sbody").innerHTML = `<p class="dsum" id="dsum"><span><b>${esc(e.space)}</b> ${esc(roomOf(e.space))}</span>${ROSTER[e.space] ? "<span>配置図より</span>" : ""}</p>
       <div class="empty" style="margin-bottom:12px">このスペースのお品書きは、まだ掲載されていません。</div>${form}`;
     $("#sbody").scrollTop = 0; sizeGallery(); return;
   }
@@ -285,16 +292,17 @@ function renderMap() {
   const pts = (a) => a.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
   const quad = (x1, y1, x2, y2, z) => [P(x1, y1, z), P(x2, y1, z), P(x2, y2, z), P(x1, y2, z)];
   let mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9;
-  ROOMS.forEach((r) => [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(([x, y]) => [0, WALL].forEach((z) => { const [a, b] = P(x, y, z); mnx = Math.min(mnx, a); mxx = Math.max(mxx, a); mny = Math.min(mny, b); mxy = Math.max(mxy, b); })));
+  ROOMS.concat(PATHS).forEach((r) => [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(([x, y]) => [0, WALL].forEach((z) => { const [a, b] = P(x, y, z); mnx = Math.min(mnx, a); mxx = Math.max(mxx, a); mny = Math.min(mny, b); mxy = Math.max(mxy, b); })));
   const pad = 40, vx = mnx - pad, vy = mny - pad, vw = mxx - mnx + pad * 2, vh = mxy - mny + pad * 2;
   let out = "";
+  PATHS.forEach((r) => (out += `<polygon class="path-floor" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
   ROOMS.forEach((r) => (out += `<polygon class="room-floor" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
   const hf = filtering() || S.scope === "fav", shown = new Set(visible().map((e) => e.space));
   const sel = S.detail ? S.detail.space : null;
   B.slice().sort((a, b) => P((a[1] + a[2]) / 2, (a[3] + a[4]) / 2)[1] - P((b[1] + b[2]) / 2, (b[3] + b[4]) / 2)[1]).forEach(([no, x1, x2, y1, y2]) => {
-    const list = bySpace[String(no)], e = list && list[0], rc = no === "受付", hit = e && hf && shown.has(e.space), dim = hf && !hit && !rc;
+    const list = bySpace[String(no)], e = list && list[0], rc = isMarker(no), hit = e && hf && shown.has(e.space), dim = hf && !hit && !rc;
     const cls = ["booth", e ? "has" : rc ? "" : "vacant", hit ? "hit" : "", dim ? "dim" : "", rc ? "recept" : "", sel === String(no) ? "sel" : ""].join(" ");
-    const label = e ? `スペース${esc(no)} ${esc(list.map((x) => x.name).join("、"))}` : `スペース${esc(no)}（掲載なし）`;
+    const label = e ? `スペース${esc(no)} ${esc(list.map((x) => x.name).join("、"))}` : `スペース${esc(no)} ${esc(ROSTER[String(no)] || "")}（お品書き未掲載）`;
     let g = `<g class="${cls}" ${rc ? "" : `data-space="${esc(no)}" tabindex="0" role="button" aria-label="${label}"`}>`;
     if (iso) g += `<polygon class="s1" points="${pts([P(x1, y2, 0), P(x2, y2, 0), P(x2, y2, Z), P(x1, y2, Z)])}"/><polygon class="s2" points="${pts([P(x1, y1, 0), P(x1, y2, 0), P(x1, y2, Z), P(x1, y1, Z)])}"/>`;
     g += `<polygon class="t" points="${pts(quad(x1, y1, x2, y2, Z))}"/>`;
@@ -348,7 +356,7 @@ function focusBooth(no) {
 }
 function boothTapped(no) {
   const list = bySpace[String(no)];
-  if (!list) openDetail({ id: "", name: `スペース ${no}`, space: String(no), tags: [], comment: "", sns: [], images: [], vacant: true }, true);
+  if (!list) openDetail({ id: "", name: ROSTER[String(no)] || `スペース ${no}`, space: String(no), tags: [], comment: "", sns: [], images: [], vacant: true }, true);
   else if (list.length === 1) openDetail(list[0], true);
   else { S.q = String(no); S.searchOpen = true; S.mode = "list"; S.detail = null; rerender(); if (!wide()) setSnap(1); }
 }
@@ -444,6 +452,7 @@ function bindEvents() {
     const fav = t.closest("[data-fav]"); if (fav) { ev.stopPropagation(); toggleFav(fav.dataset.fav); return; }
     const chip = t.closest(".chip"); if (chip) { const g = chip.dataset.tag; S.tags.has(g) ? S.tags.delete(g) : (S.tags.add(g), count(`t:${g}`)); rerender(); if (filtering() && !visible().length) count("zero"); return; }
     const sc = t.closest("[data-scope]"); if (sc) { S.scope = sc.dataset.scope; if (S.scope === "fav") count("scope:fav"); rerender(); return; }
+    const go = t.closest("[data-goto]"); if (go) { boothTapped(go.dataset.goto); focusBooth(go.dataset.goto); return; }
     const card = t.closest(".card"); if (card) { openDetail(X.find((e) => e.id === card.dataset.id)); return; }
     const booth = t.closest(".booth[data-space]"); if (booth) { if (ev.detail === 0) boothTapped(booth.dataset.space); return; } // pointer taps go through the map gestures
     if (t.closest("#back")) { backToList(); return; }
@@ -618,7 +627,7 @@ async function boot() {
       fetch("data.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
       fetch("layout.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
     ]);
-    DATA = data; ROOMS = layout.rooms; B = layout.booths; X = data.exhibitors; CATS = data.categories;
+    DATA = data; ROOMS = layout.rooms; PATHS = layout.paths || []; B = layout.booths; ROSTER = data.roster || {}; X = data.exhibitors; CATS = data.categories;
     known = new Set(CATS.flatMap((c) => c.tags));
     bySpace = {}; X.forEach((e) => { if (e.space) (bySpace[e.space] ||= []).push(e); });
     $("#sampleBar").hidden = data.mode !== "sample";

@@ -233,7 +233,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 const DRAFT = "bn_layout_draft";
 const GRID = 5;
-const NOTION_MAX = 97; // Notion の「照合：番号」の数式で使っている最大番号（数式を書き換えたらここも合わせる）
+const NOTION_MAX = 90; // Notion の「照合：番号」の数式で使っている最大番号（数式を書き換えたらここも合わせる）
 
 /* ---------- 状態 ---------- */
 // 部屋 {id,t:"room",name,short,x,y,w,h,lx,ly} / スペース {id,t:"booth",no,x1,x2,y1,y2}
@@ -265,6 +265,7 @@ function fromJson(j) {
   nid = 1;
   doc = {
     note: j.note || "", source: j.source || "",
+    paths: Array.isArray(j.paths) ? j.paths.map((p) => ({ x: +p.x, y: +p.y, w: +p.w, h: +p.h })) : [], // 通路（床だけ描く）。エディタでは編集せず、そのまま書き出す
     rooms: j.rooms.map((r) => ({ id: newId(), t: "room", name: r.name || "", short: r.short || "", x: +r.x, y: +r.y, w: +r.w, h: +r.h, lx: r.lx ?? null, ly: r.ly ?? null })),
     booths: j.booths.map((b) => ({ id: newId(), t: "booth", no: b[0], x1: +b[1], x2: +b[2], y1: +b[3], y2: +b[4] })),
   };
@@ -274,6 +275,7 @@ function toJson() {
   return {
     note: doc.note || "配置図の座標。単位は配置図の画像ピクセル。部屋は x,y,w,h、スペースは [番号, 左x, 右x, 上y, 下y]。tools/map-editor.html で編集できる。",
     source: doc.source || "",
+    ...(doc.paths?.length ? { paths: doc.paths } : {}),
     rooms: doc.rooms.map((r) => { const o = { name: r.name }; if (r.short) o.short = r.short; Object.assign(o, { x: R(r.x), y: R(r.y), w: R(r.w), h: R(r.h) }); if (r.lx != null) { o.lx = R(r.lx); o.ly = R(r.ly); } return o; }),
     booths: doc.booths.map((b) => [b.no, R(b.x1), R(b.x2), R(b.y1), R(b.y2)]),
   };
@@ -281,7 +283,7 @@ function toJson() {
 // 元の layout.json と同じく、スペースは1行に1つの読みやすい形で書き出す
 function jsonText() {
   const j = toJson();
-  const head = JSON.stringify({ note: j.note, source: j.source, rooms: j.rooms }, null, 1).replace(/\n}$/, "");
+  const head = JSON.stringify({ note: j.note, source: j.source, rooms: j.rooms, ...(j.paths ? { paths: j.paths } : {}) }, null, 1).replace(/\n}$/, "");
   return head + ',\n "booths": [\n' + j.booths.map((b) => "  " + JSON.stringify(b)).join(",\n") + "\n ]\n}\n";
 }
 
@@ -650,6 +652,7 @@ function renderPreview() {
   const src = doc.rooms.length ? doc.rooms.map((r) => ({ x1: r.x, y1: r.y, x2: r.x + r.w, y2: r.y + r.h })) : doc.booths;
   src.forEach((r) => [[r.x1, r.y1], [r.x2, r.y1], [r.x1, r.y2], [r.x2, r.y2]].forEach(([x, y]) => [0, WALL].forEach((z) => { const [a, b] = P(x, y, z); mnx = Math.min(mnx, a); mxx = Math.max(mxx, a); mny = Math.min(mny, b); mxy = Math.max(mxy, b); })));
   const pad = 40;
+  (doc.paths || []).forEach((r) => (out += `<polygon class="pv-floor" opacity=".6" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
   doc.rooms.forEach((r) => (out += `<polygon class="pv-floor" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
   doc.booths.slice().sort((a, b) => P((a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2)[1] - P((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)[1]).forEach((b) => {
     if (pvIso) out += `<polygon class="pv-s1" points="${pts([P(b.x1, b.y2, 0), P(b.x2, b.y2, 0), P(b.x2, b.y2, Z), P(b.x1, b.y2, Z)])}"/><polygon class="pv-s2" points="${pts([P(b.x1, b.y1, 0), P(b.x1, b.y2, 0), P(b.x1, b.y2, Z), P(b.x1, b.y1, Z)])}"/>`;
