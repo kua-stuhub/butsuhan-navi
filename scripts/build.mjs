@@ -176,7 +176,10 @@ async function fromNotion(token, dbId) {
   const list = [];
   for (const pg of pages) {
     const pr = pg.properties;
-    const name = clip(text(pr[P.name]), 60);
+    // フォームのプルダウンは「15　アニクエ」の形。番号と名前に分け、名前欄が空なら選んだ名前を使う
+    const rawSpace = text(pr[P.space]);
+    const picked = rawSpace.match(/^\s*([0-9０-９]+)[\s　]+(.+?)\s*$/);
+    const name = clip(text(pr[P.name]).trim() || (picked ? picked[2] : ""), 60);
     if (!name) { warn(`サークル名が空の行をスキップしました (${pg.url})`); continue; }
     const tags = [...new Set(P.tags.flatMap((k) => multi(pr[k])))];
     const imgs = files(pr[P.images]).slice(0, 5);
@@ -188,7 +191,7 @@ async function fromNotion(token, dbId) {
     list.push({
       id: hash(pg.id),
       name,
-      space: normalizeSpace(text(pr[P.space])),
+      space: normalizeSpace(picked ? picked[1] : rawSpace),
       tags,
       comment: clip(text(pr[P.comment]), 200),
       sns: parseSns(text(pr[P.sns])),
