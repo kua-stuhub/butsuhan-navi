@@ -95,7 +95,7 @@ function mapSvg(L, booth) {
     const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 40));
     for (let i = 0; i < n; i++) {
       const p1 = [ax + (bx - ax) * i / n, ay + (by - ay) * i / n], p2 = [ax + (bx - ax) * (i + 1) / n, ay + (by - ay) * (i + 1) / n], t1 = P(...p1, WALL), t2 = P(...p2, WALL);
-      items.push({ k: P((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)[1], svg: `<polygon fill="${C.wall}" fill-opacity=".22" points="${pts([P(...p1, 0), P(...p2, 0), t2, t1])}"/><line stroke="${C.label}" ${sw(2.4)} stroke-linecap="square" x1="${t1[0].toFixed(1)}" y1="${t1[1].toFixed(1)}" x2="${t2[0].toFixed(1)}" y2="${t2[1].toFixed(1)}"/>` });
+      items.push({ k: P((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)[1], svg: `<polygon fill="${C.wall}" fill-opacity=".22" points="${pts([P(...p1, 0), P(...p2, 0), t2, t1])}"/><line stroke="${C.label}" ${sw(2.4)} stroke-linecap="round" x1="${t1[0].toFixed(1)}" y1="${t1[1].toFixed(1)}" x2="${t2[0].toFixed(1)}" y2="${t2[1].toFixed(1)}"/>` });
     }
   }
   for (const [no, x1, x2, y1, y2] of L.booths) {

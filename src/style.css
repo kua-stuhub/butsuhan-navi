@@ -56,7 +56,7 @@ a.byline:hover svg{opacity:1}
 .path-floor{fill:var(--map-path)}
 .floor{fill:var(--map-floor);stroke:var(--map-floor);stroke-width:1}
 .wall-face{fill:var(--map-wall);opacity:.22}
-.wall-top{stroke:var(--map-label);stroke-width:2.6;stroke-linecap:square}
+.wall-top{stroke:var(--map-label);stroke-width:2.6;stroke-linecap:round}
 .room-floor{fill:var(--map-floor);stroke:var(--map-wall);stroke-width:1.2}
 .room-wall{fill:none;stroke:var(--map-wall);stroke-width:1.2}
 .room-label{font-family:var(--f-mono);font-weight:600;fill:var(--map-label);stroke:var(--map-floor);stroke-width:4px;stroke-linejoin:round;paint-order:stroke;letter-spacing:.06em}
