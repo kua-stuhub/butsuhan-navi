@@ -265,6 +265,7 @@ function fromJson(j) {
   nid = 1;
   doc = {
     note: j.note || "", source: j.source || "",
+    walls: Array.isArray(j.walls) ? j.walls.map((w) => w.map(Number)) : [], // 壁（配置図の線）。エディタでは編集せず、そのまま書き出す
     paths: Array.isArray(j.paths) ? j.paths.map((p) => ({ x: +p.x, y: +p.y, w: +p.w, h: +p.h })) : [], // 通路（床だけ描く）。エディタでは編集せず、そのまま書き出す
     rooms: j.rooms.map((r) => ({ id: newId(), t: "room", name: r.name || "", short: r.short || "", x: +r.x, y: +r.y, w: +r.w, h: +r.h, lx: r.lx ?? null, ly: r.ly ?? null })),
     booths: j.booths.map((b) => ({ id: newId(), t: "booth", no: b[0], x1: +b[1], x2: +b[2], y1: +b[3], y2: +b[4] })),
@@ -276,6 +277,7 @@ function toJson() {
     note: doc.note || "配置図の座標。単位は配置図の画像ピクセル。部屋は x,y,w,h、スペースは [番号, 左x, 右x, 上y, 下y]。tools/map-editor.html で編集できる。",
     source: doc.source || "",
     ...(doc.paths?.length ? { paths: doc.paths } : {}),
+    ...(doc.walls?.length ? { walls: doc.walls } : {}),
     rooms: doc.rooms.map((r) => { const o = { name: r.name }; if (r.short) o.short = r.short; Object.assign(o, { x: R(r.x), y: R(r.y), w: R(r.w), h: R(r.h) }); if (r.lx != null) { o.lx = R(r.lx); o.ly = R(r.ly); } return o; }),
     booths: doc.booths.map((b) => [b.no, R(b.x1), R(b.x2), R(b.y1), R(b.y2)]),
   };
@@ -283,7 +285,7 @@ function toJson() {
 // 元の layout.json と同じく、スペースは1行に1つの読みやすい形で書き出す
 function jsonText() {
   const j = toJson();
-  const head = JSON.stringify({ note: j.note, source: j.source, rooms: j.rooms, ...(j.paths ? { paths: j.paths } : {}) }, null, 1).replace(/\n}$/, "");
+  const head = JSON.stringify({ note: j.note, source: j.source, rooms: j.rooms, ...(j.paths ? { paths: j.paths } : {}) }, null, 1).replace(/\n}$/, "") + (j.walls ? ',\n "walls": [\n' + j.walls.map((w) => "  " + JSON.stringify(w)).join(",\n") + "\n ]" : ""); // 壁は1本1行で書き出す
   return head + ',\n "booths": [\n' + j.booths.map((b) => "  " + JSON.stringify(b)).join(",\n") + "\n ]\n}\n";
 }
 
@@ -660,9 +662,10 @@ function renderPreview() {
     const [cx, cy] = P((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2, Z), fs = Math.min(13, Math.max(9, Math.min(b.x2 - b.x1, b.y2 - b.y1) * .55));
     out += `<text class="pv-txt" x="${cx.toFixed(1)}" y="${(cy + fs * .36).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle">${esc(b.no)}</text>`;
   });
+  (doc.walls || []).forEach(([ax, ay, bx, by]) => { const a = P(ax, ay, WALL), b = P(bx, by, WALL); out += `<line class="pv-wall" stroke-width="2.4" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`; });
   doc.rooms.forEach((r) => {
     const a = [r.x, r.y], b = [r.x + r.w, r.y], d = [r.x, r.y + r.h];
-    if (pvIso) { const up = (p) => P(p[0], p[1], WALL), dn = (p) => P(p[0], p[1], 0); out += `<polyline class="pv-wall" points="${pts([up(d), up(a), up(b)])}"/>` + [a, b, d].map((p) => `<line class="pv-wall" x1="${dn(p)[0]}" y1="${dn(p)[1]}" x2="${up(p)[0]}" y2="${up(p)[1]}"/>`).join(""); }
+    if (pvIso && !(doc.walls || []).length) { const up = (p) => P(p[0], p[1], WALL), dn = (p) => P(p[0], p[1], 0); out += `<polyline class="pv-wall" points="${pts([up(d), up(a), up(b)])}"/>` + [a, b, d].map((p) => `<line class="pv-wall" x1="${dn(p)[0]}" y1="${dn(p)[1]}" x2="${up(p)[0]}" y2="${up(p)[1]}"/>`).join(""); }
     const [tx, ty] = P(r.lx ?? r.x + r.w / 2, r.ly ?? r.y + r.h / 2, 0);
     out += `<text class="pv-label" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-size="${r.short ? 15 : 20}" text-anchor="middle">${esc(r.name)}</text>`;
   });
