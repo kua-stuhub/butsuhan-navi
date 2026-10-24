@@ -2,18 +2,19 @@
    Layout: one-screen app. Gray wireframe axonometric map fills the stage; a draggable bottom sheet (peek / half / full) holds list, filters and detail. ≥900px: sheet becomes a fixed left panel. */
 :root{
   --bg:#ECEDEF; --surface:#F4F5F6; --card:#FFFFFF; --fg:#1F1E1C; --muted:#6B6E73; --line:#D3D6DA;
-  --map-bg:#D7D9DD; --map-floor:#E5E7EA; --map-wall:#8E939A; --booth-top:#F4F5F6; --booth-side:#C3C7CC; --booth-side2:#AEB3B9; --booth-stroke:#7D838B;
+  /* 地図は2026年の配置図（ベージュの床・紺の壁・朱の枠の机）に色を合わせる。画面のほかの部分はグレーのまま */
+  --map-bg:#D9D3C7; --map-path:#DDD7CC; --map-floor:#EBE7DF; --map-wall:#6F7290; --map-label:#3E405C; --booth-top:#F0DDD4; --booth-side:#DFC0B3; --booth-side2:#D2AE9F; --booth-stroke:#BE7F74; --marker:#DCEBF8; --marker-stroke:#30599F;
   --accent:#C8553D; --accent-ink:#FFFFFF; --fav:#D9A21B;
   --f-body:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Yu Gothic","Meiryo",sans-serif;
   --f-mono:"Barlow","Helvetica Neue",Arial,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#17181A; --surface:#1E2022; --card:#232528; --fg:#ECEBE8; --muted:#9CA0A6; --line:#3A3D41;
-  --map-bg:#1C1E21; --map-floor:#272A2E; --map-wall:#6E747B; --booth-top:#3A3E43; --booth-side:#2E3135; --booth-side2:#26292C; --booth-stroke:#868C94;
+  --map-bg:#17182A; --map-path:#1A1B2E; --map-floor:#222439; --map-wall:#6A6E92; --map-label:#B9BCD8; --booth-top:#4E3633; --booth-side:#3F2C2A; --booth-side2:#352523; --booth-stroke:#A0645E; --marker:#22344F; --marker-stroke:#7EA2DB;
   --accent:#E07257; --accent-ink:#1A0E0A; --fav:#E8B53A; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#17181A; --surface:#1E2022; --card:#232528; --fg:#ECEBE8; --muted:#9CA0A6; --line:#3A3D41;
-  --map-bg:#1C1E21; --map-floor:#272A2E; --map-wall:#6E747B; --booth-top:#3A3E43; --booth-side:#2E3135; --booth-side2:#26292C; --booth-stroke:#868C94;
+  --map-bg:#17182A; --map-path:#1A1B2E; --map-floor:#222439; --map-wall:#6A6E92; --map-label:#B9BCD8; --booth-top:#4E3633; --booth-side:#3F2C2A; --booth-side2:#352523; --booth-stroke:#A0645E; --marker:#22344F; --marker-stroke:#7EA2DB;
   --accent:#E07257; --accent-ink:#1A0E0A; --fav:#E8B53A; color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -52,9 +53,13 @@ a.byline:hover svg{opacity:1}
 .mapbox.panning{cursor:grabbing}
 .mapbox svg{display:block;position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
 .mapbox svg.anim{transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.path-floor{fill:var(--map-path)}
+.floor{fill:var(--map-floor);stroke:var(--map-floor);stroke-width:1}
+.wall-face{fill:var(--map-wall);opacity:.22}
+.wall-top{stroke:var(--map-label);stroke-width:2.6;stroke-linecap:round}
 .room-floor{fill:var(--map-floor);stroke:var(--map-wall);stroke-width:1.2}
 .room-wall{fill:none;stroke:var(--map-wall);stroke-width:1.2}
-.room-label{font-family:var(--f-mono);font-weight:600;fill:var(--muted);letter-spacing:.06em}
+.room-label{font-family:var(--f-mono);font-weight:600;fill:var(--map-label);stroke:var(--map-floor);stroke-width:4px;stroke-linejoin:round;paint-order:stroke;letter-spacing:.06em}
 .booth .t{fill:var(--booth-top);stroke:var(--booth-stroke);stroke-width:.8}
 .booth .s1{fill:var(--booth-side);stroke:var(--booth-stroke);stroke-width:.8}
 .booth .s2{fill:var(--booth-side2);stroke:var(--booth-stroke);stroke-width:.8}
@@ -69,7 +74,9 @@ a.byline:hover svg{opacity:1}
 .booth.hit text{fill:var(--accent-ink)}
 .booth.dim{opacity:.4}
 .booth.sel .t{stroke:var(--fg);stroke-width:2.6}
-.booth.recept .t{fill:var(--line)}
+.booth.recept .t{fill:var(--marker);stroke:var(--marker-stroke)}
+.booth.recept .s1,.booth.recept .s2{fill:var(--marker);stroke:var(--marker-stroke);opacity:.7}
+.booth.recept text{fill:var(--marker-stroke)}
 .favdot{fill:var(--fav);stroke:var(--card);stroke-width:1.5}
 
 .mapctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:6px;z-index:3}
@@ -204,6 +211,11 @@ a.byline:hover svg{opacity:1}
 .btn.alt{background:none;color:var(--fg)}
 a.btn{display:inline-block;text-decoration:none;line-height:1.6}
 .btn[aria-pressed="true"]{background:var(--fav);border-color:var(--fav);color:#1a1405}
+.roster{margin-top:14px;border-top:1px solid var(--line);padding-top:8px}
+.roster p{margin:0 0 4px;font-size:11.5px;color:var(--muted)}
+.rrow{display:grid;grid-template-columns:2.6em 1fr auto;gap:8px;align-items:baseline;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:9px 2px;cursor:pointer;color:var(--fg)}
+.rrow b{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.rrow small{color:var(--muted);font-size:11.5px}
 .foot{font-size:11px;color:var(--muted);line-height:1.7;margin-top:22px}
 
 /* wide screens: sheet → side panel */

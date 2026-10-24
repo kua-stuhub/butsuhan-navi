@@ -17,7 +17,7 @@ const store = {
 };
 
 /* ---------- data (filled by boot) ---------- */
-let ROOMS = [], B = [], X = [], CATS = [], DATA = null;
+let ROOMS = [], PATHS = [], WALLS = [], B = [], X = [], CATS = [], DATA = null, ROSTER = {};
 let bySpace = {};
 const roomOf = (no) => {
   const b = B.find((b) => String(b[0]) === String(no)); if (!b) return "";
@@ -48,6 +48,12 @@ function matches(e) {
   return true;
 }
 const filtering = () => S.tags.size > 0 || S.q.trim() !== "";
+// 配置図の出展者リストにだけ名前があって、お品書きが未掲載のスペース（検索のときだけ一覧の下に出す）
+const rosterHits = () => {
+  const q = S.q.trim().normalize("NFKC").toLowerCase(); if (!q || S.scope !== "all" || S.tags.size) return [];
+  return Object.entries(ROSTER).filter(([no, name]) => !bySpace[no] && (name.normalize("NFKC").toLowerCase().includes(q) || no === q)).sort((a, b) => a[0] - b[0]);
+};
+const isMarker = (no) => !/^\d+$/.test(String(no)); // 受付・フォトブースなど、押せない目印
 const visible = () => X.filter((e) => (S.scope === "all" || favs.has(e.id)) && matches(e));
 
 const star = `<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z" stroke-linejoin="round"/></svg>`;
@@ -78,7 +84,8 @@ function renderSheet() {
     </div>
     ${oc ? `<div class="chips sub">${oc.tags.filter((t) => counts[t] || known.has(t)).map((t) => `<button type="button" class="chip" data-tag="${esc(t)}" aria-pressed="${S.tags.has(t)}">${esc(short(t))}<small>${counts[t] || 0}</small></button>`).join("")}</div>` : ""}
     <div class="grid">${list.length ? list.map(cardHTML).join("") :
-      `<div class="empty">${S.scope === "fav" && !favs.size ? "お気に入りはまだありません。<br>カードの☆を押すと、ここに集まります。<br>この端末のブラウザにだけ保存されます。" : X.length ? "条件に合う出展者はいません。<br>タグを減らすか、検索語を変えてください。" : "掲載中の出展者はまだいません。<br>掲載が始まるまでお待ちください。"}</div>`}</div>
+      rosterHits().length ? "" : `<div class="empty">${S.scope === "fav" && !favs.size ? "お気に入りはまだありません。<br>カードの☆を押すと、ここに集まります。<br>この端末のブラウザにだけ保存されます。" : X.length ? "条件に合う出展者はいません。<br>タグを減らすか、検索語を変えてください。" : "掲載中の出展者はまだいません。<br>掲載が始まるまでお待ちください。"}</div>`}</div>
+    ${rosterHits().length ? `<div class="roster"><p>お品書き未掲載（配置図より）</p>${rosterHits().map(([no, name]) => `<button type="button" class="rrow" data-goto="${esc(no)}"><b>${esc(no)}</b><span>${esc(name)}</span><small>${esc(roomOf(no))}</small></button>`).join("")}</div>` : ""}
     <p class="foot">${S.sort === "shuffle" ? "並び順は見る人ごとにシャッフルされるので、特定の出展者がいつも上に来ることはありません。<br>" : ""}${updated ? `最終更新 ${esc(updated)}<br>` : ""}${org}有志による非公式の取り組みです。大学・学園祭実行委員会・物販イベント主催とは関係ありません。掲載内容の修正・削除は${contact}までご連絡ください。</p>`;
   // 検索欄は作り直さずに残す（入力中に作り直すと、日本語の変換が壊れて文字が二重になる）
   const body = $("#sbody"), showQ = S.searchOpen || S.q;
@@ -110,9 +117,9 @@ function cardHTML(e) {
 function renderDetail() {
   const e = S.detail, n = e.images.length;
   $("#headSlot").innerHTML = `<div class="dhead"><button type="button" class="back" id="back">‹ 一覧</button><h2>${esc(e.name)}</h2></div>`;
-  if (e.vacant) { // a space nobody has listed yet
+  if (e.vacant) { // a space nobody has listed yet（配置図の名前があれば見出しに出す）
     const form = DATA?.form?.url ? `<p class="foot" style="margin-top:0">出展者の方へ：<a href="${esc(safeUrl(DATA.form.url))}" target="_blank" rel="noopener">${esc(DATA.form.label || "掲載フォーム")}</a>からお品書きを載せられます。</p>` : "";
-    $("#sbody").innerHTML = `<p class="dsum" id="dsum"><span>${esc(roomOf(e.space))}</span></p>
+    $("#sbody").innerHTML = `<p class="dsum" id="dsum"><span><b>${esc(e.space)}</b> ${esc(roomOf(e.space))}</span>${ROSTER[e.space] ? "<span>配置図より</span>" : ""}</p>
       <div class="empty" style="margin-bottom:12px">このスペースのお品書きは、まだ掲載されていません。</div>${form}`;
     $("#sbody").scrollTop = 0; sizeGallery(); return;
   }
@@ -285,27 +292,42 @@ function renderMap() {
   const pts = (a) => a.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
   const quad = (x1, y1, x2, y2, z) => [P(x1, y1, z), P(x2, y1, z), P(x2, y2, z), P(x1, y2, z)];
   let mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9;
-  ROOMS.forEach((r) => [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(([x, y]) => [0, WALL].forEach((z) => { const [a, b] = P(x, y, z); mnx = Math.min(mnx, a); mxx = Math.max(mxx, a); mny = Math.min(mny, b); mxy = Math.max(mxy, b); })));
+  ROOMS.concat(PATHS).forEach((r) => [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(([x, y]) => [0, WALL].forEach((z) => { const [a, b] = P(x, y, z); mnx = Math.min(mnx, a); mxx = Math.max(mxx, a); mny = Math.min(mny, b); mxy = Math.max(mxy, b); })));
   const pad = 40, vx = mnx - pad, vy = mny - pad, vw = mxx - mnx + pad * 2, vh = mxy - mny + pad * 2;
   let out = "";
-  ROOMS.forEach((r) => (out += `<polygon class="room-floor" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
+  // 壁（walls）があるときは、部屋と通路を1つの床として描き、壁は配置図の線のとおりに立てる。ないときは部屋ごとの箱
+  const one = WALLS.length > 0;
+  PATHS.forEach((r) => (out += `<polygon class="${one ? "floor" : "path-floor"}" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
+  ROOMS.forEach((r) => (out += `<polygon class="${one ? "floor" : "room-floor"}" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
+  // 机と壁を奥から順に描く。長い壁は短く切って、手前の机を隠さないようにする
+  const items = [];
+  for (const [ax, ay, bx, by] of WALLS) {
+    const n = iso ? Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 40)) : 1;
+    for (let i = 0; i < n; i++) {
+      const p1 = [ax + (bx - ax) * i / n, ay + (by - ay) * i / n], p2 = [ax + (bx - ax) * (i + 1) / n, ay + (by - ay) * (i + 1) / n];
+      const svg = (iso ? `<polygon class="wall-face" points="${pts([P(...p1, 0), P(...p2, 0), P(...p2, WALL), P(...p1, WALL)])}"/>` : "")
+        + `<line class="wall-top" x1="${P(...p1, WALL)[0].toFixed(1)}" y1="${P(...p1, WALL)[1].toFixed(1)}" x2="${P(...p2, WALL)[0].toFixed(1)}" y2="${P(...p2, WALL)[1].toFixed(1)}"/>`;
+      items.push({ k: P((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)[1], svg });
+    }
+  }
   const hf = filtering() || S.scope === "fav", shown = new Set(visible().map((e) => e.space));
   const sel = S.detail ? S.detail.space : null;
-  B.slice().sort((a, b) => P((a[1] + a[2]) / 2, (a[3] + a[4]) / 2)[1] - P((b[1] + b[2]) / 2, (b[3] + b[4]) / 2)[1]).forEach(([no, x1, x2, y1, y2]) => {
-    const list = bySpace[String(no)], e = list && list[0], rc = no === "受付", hit = e && hf && shown.has(e.space), dim = hf && !hit && !rc;
+  B.forEach(([no, x1, x2, y1, y2]) => {
+    const list = bySpace[String(no)], e = list && list[0], rc = isMarker(no), hit = e && hf && shown.has(e.space), dim = hf && !hit && !rc;
     const cls = ["booth", e ? "has" : rc ? "" : "vacant", hit ? "hit" : "", dim ? "dim" : "", rc ? "recept" : "", sel === String(no) ? "sel" : ""].join(" ");
-    const label = e ? `スペース${esc(no)} ${esc(list.map((x) => x.name).join("、"))}` : `スペース${esc(no)}（掲載なし）`;
+    const label = e ? `スペース${esc(no)} ${esc(list.map((x) => x.name).join("、"))}` : `スペース${esc(no)} ${esc(ROSTER[String(no)] || "")}（お品書き未掲載）`;
     let g = `<g class="${cls}" ${rc ? "" : `data-space="${esc(no)}" tabindex="0" role="button" aria-label="${label}"`}>`;
     if (iso) g += `<polygon class="s1" points="${pts([P(x1, y2, 0), P(x2, y2, 0), P(x2, y2, Z), P(x1, y2, Z)])}"/><polygon class="s2" points="${pts([P(x1, y1, 0), P(x1, y2, 0), P(x1, y2, Z), P(x1, y1, Z)])}"/>`;
     g += `<polygon class="t" points="${pts(quad(x1, y1, x2, y2, Z))}"/>`;
     const [cx, cy] = P((x1 + x2) / 2, (y1 + y2) / 2, Z), fs = Math.min(13, Math.max(9, Math.min(x2 - x1, y2 - y1) * .55));
     g += `<text x="${cx.toFixed(1)}" y="${(cy + fs * .36).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle">${esc(no)}</text>`;
     if (list && list.some((x) => favs.has(x.id))) { const [fx, fy] = P(x2, y1, Z); g += `<circle class="favdot" cx="${fx.toFixed(1)}" cy="${(fy - 2).toFixed(1)}" r="5.5"/>`; }
-    out += g + "</g>";
+    items.push({ k: P((x1 + x2) / 2, (y1 + y2) / 2)[1], svg: g + "</g>" });
   });
+  items.sort((a, b) => a.k - b.k).forEach((it) => (out += it.svg));
   ROOMS.forEach((r) => {
     const a = [r.x, r.y], b = [r.x + r.w, r.y], d = [r.x, r.y + r.h];
-    if (iso) { const upP = (p) => P(p[0], p[1], WALL), dn = (p) => P(p[0], p[1], 0);
+    if (iso && !one) { const upP = (p) => P(p[0], p[1], WALL), dn = (p) => P(p[0], p[1], 0);
       out += `<polyline class="room-wall" points="${pts([upP(d), upP(a), upP(b)])}"/>` + [a, b, d].map((p) => `<line class="room-wall" x1="${dn(p)[0]}" y1="${dn(p)[1]}" x2="${upP(p)[0]}" y2="${upP(p)[1]}"/>`).join(""); }
     const [tx, ty] = P(r.lx ?? r.x + r.w / 2, r.ly ?? r.y + r.h / 2, 0);
     out += `<text class="room-label" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-size="${r.short ? 15 : 20}" text-anchor="middle">${esc(r.name)}</text>`;
@@ -348,7 +370,7 @@ function focusBooth(no) {
 }
 function boothTapped(no) {
   const list = bySpace[String(no)];
-  if (!list) openDetail({ id: "", name: `スペース ${no}`, space: String(no), tags: [], comment: "", sns: [], images: [], vacant: true }, true);
+  if (!list) openDetail({ id: "", name: ROSTER[String(no)] || `スペース ${no}`, space: String(no), tags: [], comment: "", sns: [], images: [], vacant: true }, true);
   else if (list.length === 1) openDetail(list[0], true);
   else { S.q = String(no); S.searchOpen = true; S.mode = "list"; S.detail = null; rerender(); if (!wide()) setSnap(1); }
 }
@@ -444,6 +466,7 @@ function bindEvents() {
     const fav = t.closest("[data-fav]"); if (fav) { ev.stopPropagation(); toggleFav(fav.dataset.fav); return; }
     const chip = t.closest(".chip"); if (chip) { const g = chip.dataset.tag; S.tags.has(g) ? S.tags.delete(g) : (S.tags.add(g), count(`t:${g}`)); rerender(); if (filtering() && !visible().length) count("zero"); return; }
     const sc = t.closest("[data-scope]"); if (sc) { S.scope = sc.dataset.scope; if (S.scope === "fav") count("scope:fav"); rerender(); return; }
+    const go = t.closest("[data-goto]"); if (go) { boothTapped(go.dataset.goto); focusBooth(go.dataset.goto); return; }
     const card = t.closest(".card"); if (card) { openDetail(X.find((e) => e.id === card.dataset.id)); return; }
     const booth = t.closest(".booth[data-space]"); if (booth) { if (ev.detail === 0) boothTapped(booth.dataset.space); return; } // pointer taps go through the map gestures
     if (t.closest("#back")) { backToList(); return; }
@@ -618,7 +641,7 @@ async function boot() {
       fetch("data.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
       fetch("layout.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
     ]);
-    DATA = data; ROOMS = layout.rooms; B = layout.booths; X = data.exhibitors; CATS = data.categories;
+    DATA = data; ROOMS = layout.rooms; PATHS = layout.paths || []; WALLS = layout.walls || []; B = layout.booths; ROSTER = data.roster || {}; X = data.exhibitors; CATS = data.categories;
     known = new Set(CATS.flatMap((c) => c.tags));
     bySpace = {}; X.forEach((e) => { if (e.space) (bySpace[e.space] ||= []).push(e); });
     $("#sampleBar").hidden = data.mode !== "sample";

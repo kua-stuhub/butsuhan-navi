@@ -13,7 +13,8 @@ import crypto from "node:crypto";
 
 const W = 1200, H = 630, SPLIT = 680;           // 左 0〜680 が文字、右 680〜1200 が地図
 const TX = 56, TW = SPLIT - TX - 40;             // 文字の左端と最大幅
-const C = { panel: "#F4F5F6", mapBg: "#D7D9DD", floor: "#E5E7EA", wall: "#8E939A", top: "#F4F5F6", side: "#C3C7CC", side2: "#AEB3B9", stroke: "#7D838B", fg: "#1F1E1C", muted: "#6B6E73", line: "#D3D6DA", accent: "#C8553D" };
+// 色は2026年の配置図（ベージュの床・紺の壁・朱の枠の机・青い目印）に合わせる。サイトの地図（src/style.css の --map-*）と同じ値
+const C = { panel: "#F3EFE7", mapBg: "#D9D3C7", path: "#DDD7CC", floor: "#EBE7DF", wall: "#6F7290", top: "#F0DDD4", side: "#DFC0B3", side2: "#D2AE9F", stroke: "#BE7F74", marker: "#DCEBF8", markerStroke: "#30599F", label: "#3E405C", fg: "#1F1E1C", muted: "#6E6A62", line: "#D9D2C4", accent: "#C8553D" };
 const hash = (s) => crypto.createHash("sha1").update(s).digest("hex").slice(0, 12);
 
 /* ---------- 文字 ---------- */
@@ -71,7 +72,7 @@ function mapSvg(L, booth) {
     const x1 = Math.max(r.x, cx - 260), x2 = Math.min(r.x + r.w, cx + 260), y1 = Math.max(r.y, cy - 200), y2 = Math.min(r.y + r.h, cy + 200);
     fr = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
   } else {
-    const xs = L.rooms.flatMap((r) => [r.x, r.x + r.w]), ys = L.rooms.flatMap((r) => [r.y, r.y + r.h]);
+    const all = L.rooms.concat(L.paths || []), xs = all.flatMap((r) => [r.x, r.x + r.w]), ys = all.flatMap((r) => [r.y, r.y + r.h]);
     fr = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
   }
   let mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9;
@@ -84,16 +85,29 @@ function mapSvg(L, booth) {
   const ox = SPLIT + areaW / 2 - s * (mnx + mxx) / 2, oy = H / 2 - s * (mny + mxy) / 2 + (booth ? 14 : 0);
   const sw = (w) => `vector-effect="non-scaling-stroke" stroke-width="${w}"`;
   let g = "";
-  for (const r of L.rooms) g += `<polygon fill="${C.floor}" stroke="${C.wall}" ${sw(1.2)} points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`;
-  // 奥から順に描く。選んだブースは手前のブースに隠れないよう最後に描く
-  const order = L.booths.slice().sort((p, q) => P(...center(p))[1] - P(...center(q))[1]).sort((p, q) => (String(p[0]) === sel) - (String(q[0]) === sel));
-  for (const [no, x1, x2, y1, y2] of order) {
-    const on = String(no) === sel, [t, s1, s2, st] = on ? [C.accent, "#A8432E", "#923826", "#7E2F1F"] : [C.top, C.side, C.side2, C.stroke];
-    g += `<polygon fill="${s1}" stroke="${st}" ${sw(.8)} points="${pts([P(x1, y2, 0), P(x2, y2, 0), P(x2, y2, Z), P(x1, y2, Z)])}"/>`;
-    g += `<polygon fill="${s2}" stroke="${st}" ${sw(.8)} points="${pts([P(x1, y1, 0), P(x1, y2, 0), P(x1, y2, Z), P(x1, y1, Z)])}"/>`;
-    g += `<polygon fill="${t}" stroke="${st}" ${sw(.8)} points="${pts(quad(x1, y1, x2, y2, Z))}"/>`;
+  // 壁（walls）があれば、部屋と通路を1つの床にして、壁は配置図の線のとおりに立てる（サイトの地図と同じ）
+  const walls = L.walls || [], one = walls.length > 0;
+  for (const r of L.paths || []) g += `<polygon fill="${one ? C.floor : C.path}" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`;
+  for (const r of L.rooms) g += one ? `<polygon fill="${C.floor}" stroke="${C.floor}" ${sw(1)} points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>` : `<polygon fill="${C.floor}" stroke="${C.wall}" ${sw(1.2)} points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`;
+  // 机と壁を奥から順に描く（長い壁は短く切る）。選んだブースは手前に隠れないよう最後に描く
+  const items = [];
+  for (const [ax, ay, bx, by] of walls) {
+    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 40));
+    for (let i = 0; i < n; i++) {
+      const p1 = [ax + (bx - ax) * i / n, ay + (by - ay) * i / n], p2 = [ax + (bx - ax) * (i + 1) / n, ay + (by - ay) * (i + 1) / n], t1 = P(...p1, WALL), t2 = P(...p2, WALL);
+      items.push({ k: P((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)[1], svg: `<polygon fill="${C.wall}" fill-opacity=".22" points="${pts([P(...p1, 0), P(...p2, 0), t2, t1])}"/><line stroke="${C.label}" ${sw(2.4)} stroke-linecap="round" x1="${t1[0].toFixed(1)}" y1="${t1[1].toFixed(1)}" x2="${t2[0].toFixed(1)}" y2="${t2[1].toFixed(1)}"/>` });
+    }
   }
-  for (const r of L.rooms) {
+  for (const [no, x1, x2, y1, y2] of L.booths) {
+    const on = String(no) === sel, mk = !/^\d+$/.test(String(no));
+    const [t, s1, s2, st] = on ? [C.accent, "#A8432E", "#923826", "#7E2F1F"] : mk ? [C.marker, C.marker, C.marker, C.markerStroke] : [C.top, C.side, C.side2, C.stroke];
+    const svg = `<polygon fill="${s1}" stroke="${st}" ${sw(.8)} points="${pts([P(x1, y2, 0), P(x2, y2, 0), P(x2, y2, Z), P(x1, y2, Z)])}"/>`
+      + `<polygon fill="${s2}" stroke="${st}" ${sw(.8)} points="${pts([P(x1, y1, 0), P(x1, y2, 0), P(x1, y2, Z), P(x1, y1, Z)])}"/>`
+      + `<polygon fill="${t}" stroke="${st}" ${sw(.8)} points="${pts(quad(x1, y1, x2, y2, Z))}"/>`;
+    items.push({ k: on ? 1e9 : P(...center([no, x1, x2, y1, y2]))[1], svg });
+  }
+  items.sort((a, b) => a.k - b.k).forEach((it) => (g += it.svg));
+  for (const r of one ? [] : L.rooms) {
     const a = [r.x, r.y], b = [r.x + r.w, r.y], d = [r.x, r.y + r.h], up = (p) => P(p[0], p[1], WALL), dn = (p) => P(p[0], p[1], 0);
     g += `<polyline fill="none" stroke="${C.wall}" ${sw(1.2)} points="${pts([up(d), up(a), up(b)])}"/>`;
     g += [a, b, d].map((p) => `<line stroke="${C.wall}" ${sw(1.2)} x1="${dn(p)[0].toFixed(1)}" y1="${dn(p)[1].toFixed(1)}" x2="${up(p)[0].toFixed(1)}" y2="${up(p)[1].toFixed(1)}"/>`).join("");
@@ -116,7 +130,7 @@ function frame(L, booth, body, cfg) {
   // スマホでは画像が小さく表示されるので、文字は大きめにする
   s += text(JP_B, ev.name, TX, 92, 36, C.fg);
   let hx = TX + adv(JP_B, ev.name, 36) + 10;
-  s += `<rect x="${hx.toFixed(1)}" y="58" width="${(adv(NUM, year, 34) + 18).toFixed(1)}" height="44" rx="7" fill="${C.fg}"/>` + text(NUM, year, hx + 9, 92, 34, C.panel);
+  s += `<rect x="${hx.toFixed(1)}" y="58" width="${(adv(NUM, year, 34) + 18).toFixed(1)}" height="44" rx="7" fill="#3E405C"/>` + text(NUM, year, hx + 9, 92, 34, C.panel);
   hx += adv(NUM, year, 34) + 30;
   s += text(JP_B, "物販ナビ", hx, 92, 36, C.fg) + text(JP_M, "（非公式）", hx + adv(JP_B, "物販ナビ", 36) + 2, 92, 22, C.muted);
   s += body;
