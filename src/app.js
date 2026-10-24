@@ -336,7 +336,7 @@ function renderMap() {
   const width = W, height = Math.round(W * vh / vw);
   const keep = geo && (geo.proj !== S.proj || geo.width !== width) ? centerPoint() : null;
   box.innerHTML = `<svg width="${width}" height="${height}" viewBox="${vx.toFixed(0)} ${vy.toFixed(0)} ${vw.toFixed(0)} ${vh.toFixed(0)}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="物販会場の配置図">${out}</svg>`;
-  geo = { width, height, vx, vy, vw, vh, P, proj: S.proj };
+  geo = { width, height, vx, vy, vw, vh, P, proj: S.proj }; ST = { ox: 0, oy: 0, k: 1 }; // 描き直した直後は等倍の地図そのもの
   if (!MV.init) { MV.init = true; MV.s = S.zoom; MV.tx = (W - width * MV.s) * .3; MV.ty = (visH() - height * MV.s) / 2; }
   else if (keep) { MV.tx = box.clientWidth / 2 - keep.x * width * MV.s; MV.ty = visH() / 2 - keep.y * height * MV.s; }
   applyView();
@@ -352,10 +352,26 @@ function clampView() {
   MV.tx = w < bw - 2 * m ? (bw - w) / 2 : Math.min(m, Math.max(bw - w - m, MV.tx));
   MV.ty = h < bh - 2 * m ? (bh - h) / 2 : Math.min(m, Math.max(bh - h - m, MV.ty));
 }
+// 拡大はまず CSS の transform で動かし（なめらかさ優先）、指が止まったら SVG を描き直してくっきりさせる。
+// transform で拡大したままだと、ブラウザが等倍で描いた絵を引き伸ばすので、文字や線がぼやける。
+// 描き直すときは画面の3倍の範囲だけを viewBox で切り出すので、拡大しても絵の大きさは増えない。
+// ST: いまの SVG 要素の1ピクセルが、等倍の地図のどこに当たるか（元の位置 = ox + 要素のピクセル / k）
+let ST = { ox: 0, oy: 0, k: 1 }, settleT = 0;
 function applyView(anim) {
   const svg = $("#mapbox svg"); if (!svg) return; clampView();
   svg.classList.toggle("anim", !!anim);
-  svg.style.transform = `translate(${MV.tx}px,${MV.ty}px) scale(${MV.s})`;
+  svg.style.transform = `translate(${MV.tx + MV.s * ST.ox}px,${MV.ty + MV.s * ST.oy}px) scale(${MV.s / ST.k})`;
+  clearTimeout(settleT); settleT = setTimeout(settleMap, anim ? 420 : 160);
+}
+function settleMap() {
+  const svg = $("#mapbox svg"), box = $("#mapbox"); if (!svg || !geo) return;
+  const bw = box.clientWidth, bh = box.clientHeight, s = MV.s, ox = (-bw - MV.tx) / s, oy = (-bh - MV.ty) / s;
+  const ux = geo.vw / geo.width, uy = geo.vh / geo.height;
+  svg.classList.remove("anim");
+  svg.setAttribute("width", bw * 3); svg.setAttribute("height", bh * 3); svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("viewBox", `${(geo.vx + ox * ux).toFixed(2)} ${(geo.vy + oy * uy).toFixed(2)} ${(bw * 3 / s * ux).toFixed(2)} ${(bh * 3 / s * uy).toFixed(2)}`);
+  ST = { ox, oy, k: s };
+  svg.style.transform = `translate(${MV.tx + s * ox}px,${MV.ty + s * oy}px) scale(1)`;
 }
 function zoomAt(px, py, f, anim) {
   const ns = Math.min(6, Math.max(.8, MV.s * f)); f = ns / MV.s;
