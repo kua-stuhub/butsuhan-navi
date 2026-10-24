@@ -168,7 +168,7 @@ async function fromNotion(token, dbId) {
     cursor = j.has_more ? j.next_cursor : undefined;
   } while (cursor);
 
-  const text = (p) => (p?.title || p?.rich_text || []).map((t) => t.plain_text).join("");
+  const text = (p) => p?.select ? p.select.name : (p?.title || p?.rich_text || []).map((t) => t.plain_text).join("");
   const multi = (p) => (p?.multi_select || []).map((o) => o.name);
   const files = (p) => (p?.files || []).map((f) => ({ url: f.file?.url || f.external?.url, name: f.name || "" })).filter((f) => f.url);
 
@@ -176,7 +176,7 @@ async function fromNotion(token, dbId) {
   const list = [];
   for (const pg of pages) {
     const pr = pg.properties;
-    // フォームのプルダウンは「15　アニクエ」の形。番号と名前に分け、名前欄が空なら選んだ名前を使う
+    // フォームのプルダウン（Notion では選択の列）は「15　アニクエ」の形。番号と名前に分け、名前欄が空なら選んだ名前を使う
     const rawSpace = text(pr[P.space]);
     const picked = rawSpace.match(/^\s*([0-9０-９]+)[\s　]+(.+?)\s*$/);
     const name = clip(text(pr[P.name]).trim() || (picked ? picked[2] : ""), 60);
