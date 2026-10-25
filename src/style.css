@@ -215,6 +215,13 @@ a.byline:hover svg{opacity:1}
 .btn.alt{background:none;color:var(--fg)}
 a.btn{display:inline-block;text-decoration:none;line-height:1.6}
 .btn[aria-pressed="true"]{background:var(--fav);border-color:var(--fav);color:#1a1405}
+/* 出展者詳細のボタン列：スマホ幅でも1行に収める（地図はアイコンだけ、共有・ポストはアイコン＋短い言葉） */
+.dact{flex-wrap:nowrap;gap:6px}
+.dact .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;padding:9px 13px;line-height:1.6}
+.dact .btn.ico{padding-inline:11px}
+.dact .btn svg{flex:none}
+@media (max-width:360px){.dact .btn{padding-inline:10px}.dact .btn.ico{padding-inline:9px}}
+@media (max-width:340px){.dact .lbl{display:none}}
 /* 共有ボタンでリンクをコピーしたときの小さなお知らせ */
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:70;transform:translate(-50%,8px);background:var(--fg);color:var(--bg);border-radius:999px;padding:9px 18px;font-size:14px;font-weight:700;box-shadow:0 4px 16px rgba(0,0,0,.2);opacity:0;pointer-events:none;white-space:nowrap;transition:opacity .2s,transform .2s}
 .toast.show{opacity:1;transform:translate(-50%,0)}
