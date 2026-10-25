@@ -14,12 +14,12 @@
 
 const MAX_BYTES = 16384, MAX_KEYS = 200, MAX_COUNT = 500;
 // 受け取るキーの形。これ以外は捨てる
-//   pv … ページを開いた / d:<id> 詳細 / p:<id> 写真ビューア / pg:<id>:<n> 写真のn枚目
+//   pv … ページを開いた / nv … その端末ではじめて数えた（端末の数の目安） / d:<id> 詳細 / p:<id> 写真ビューア / pg:<id>:<n> 写真のn枚目
 //   f+:<id> f-:<id> お気に入りの追加・解除 / s:<id> 共有 / from:map|list|link 詳細をどこから開いたか
 //   t:<タグ> 絞り込み / q 検索 / zero 絞り込みで0件 / scope:fav / sort:shuffle|space / proj:iso|flat
 //   dh:<id>:pre|am|mid|pm 詳細を開いた時間帯（開催前／当日の午前・昼・午後）
 //   help / imgerr / ld:<秒の目安> 最初の表示までの時間 / h:<0-23> 見られた時間帯（日本時間）
-const KEY = /^(pv|q|zero|help|imgerr|scope:fav|sort:(shuffle|space)|proj:(iso|flat)|from:(map|list|link)|ld:\d{1,2}|h:\d{1,2}|(d|p|f\+|f-|s):[A-Za-z0-9_-]{1,40}|pg:[A-Za-z0-9_-]{1,40}:\d|dh:[A-Za-z0-9_-]{1,40}:(pre|am|mid|pm)|t:[^\s]{1,40})$/u;
+const KEY = /^(pv|nv|q|zero|help|imgerr|scope:fav|sort:(shuffle|space)|proj:(iso|flat)|from:(map|list|link)|ld:\d{1,2}|h:\d{1,2}|(d|p|f\+|f-|s):[A-Za-z0-9_-]{1,40}|pg:[A-Za-z0-9_-]{1,40}:\d|dh:[A-Za-z0-9_-]{1,40}:(pre|am|mid|pm)|t:[^\s]{1,40})$/u;
 
 const cors = (env) => ({
   "Access-Control-Allow-Origin": env.SITE_ORIGIN || "*",
@@ -55,9 +55,9 @@ export default {
         "SELECT j.key AS key, SUM(j.value) AS n FROM batches, json_each(batches.data) AS j GROUP BY j.key ORDER BY j.key"
       ).all();
       const { results: meta } = await env.DB.prepare("SELECT COUNT(*) AS batches, MIN(at) AS first, MAX(at) AS last FROM batches").all();
-      // 日本時間の日付ごとの送信数とページを開いた回数
+      // 日本時間の日付ごとの送信数・ページを開いた回数・はじめての端末の数
       const { results: daily } = await env.DB.prepare(
-        "SELECT substr(datetime(at, '+9 hours'), 1, 10) AS day, COUNT(*) AS batches, SUM(COALESCE(json_extract(data, '$.pv'), 0)) AS pv FROM batches GROUP BY day ORDER BY day"
+        "SELECT substr(datetime(at, '+9 hours'), 1, 10) AS day, COUNT(*) AS batches, SUM(COALESCE(json_extract(data, '$.pv'), 0)) AS pv, SUM(COALESCE(json_extract(data, '$.nv'), 0)) AS nv FROM batches GROUP BY day ORDER BY day"
       ).all();
       return Response.json({ ...meta[0], daily, counts: Object.fromEntries(results.map((r) => [r.key, r.n])) });
     }
@@ -109,9 +109,9 @@ button:focus-visible,input:focus-visible,th:focus-visible{outline:2px solid var(
 .top .t{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
 .top .acts{display:flex;gap:6px}
 /* KPI */
-.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.kpis{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
-.kpi span{display:block;color:var(--muted);font-size:11px}
+.kpi span{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi b{display:block;font-size:24px;line-height:1.25;font-variant-numeric:tabular-nums;font-weight:700}
 .kpi b small{font-size:13px;font-weight:600;color:var(--muted);margin-left:2px}
 /* 段 */
@@ -343,14 +343,14 @@ function render(x) {
 
   var lds = []; for (var s = 0; s <= 30; s++) lds.push([s, n("ld:" + s)]);
   var med = median(lds);
-  var kp = [["ページを開いた回数", fmt(n("pv"))], ["詳細を開いた回数", fmt(sum(/^d:/))], ["写真を開いた回数", fmt(sum(/^p:/))],
+  var kp = [["訪問した端末の数", fmt(n("nv"))], ["ページを開いた回数", fmt(n("pv"))], ["詳細を開いた回数", fmt(sum(/^d:/))], ["写真を開いた回数", fmt(sum(/^p:/))],
     ["お気に入り（追加−解除）", fmt(sum(/^f\+:/) - sum(/^f-:/))], ["共有", fmt(sum(/^s:/))], ["表示までの時間（中央値）", med ? med.v : "—", "秒"]];
   var kb = $("#kpis"); kb.textContent = "";
   kp.forEach(function (k) { var d = el("div", "kpi"); var b = el("b", "", k[1]); if (k[2] && med) b.append(el("small", "", k[2])); d.append(el("span", "", k[0]), b); kb.append(d); });
 
   var start = (window.EVENT_START || "");
   columns($("#daily"), (x.daily || []).map(function (d) {
-    return { v: d.pv, label: d.day.slice(5).replace("-", "/"), tip: d.day.slice(5).replace("-", "/"), cls: start && d.day < start ? "pre" : "" };
+    return { v: d.pv, label: d.day.slice(5).replace("-", "/"), tip: d.day.slice(5).replace("-", "/") + "・はじめての端末 " + fmt(d.nv || 0) + "・ページを開いた回数", cls: start && d.day < start ? "pre" : "" };
   }), { values: true });
   var hs = []; for (var h = 0; h < 24; h++) hs.push({ v: n("h:" + h), label: String(h), tip: h + "時台" });
   columns($("#hours"), hs, { dense: true });
