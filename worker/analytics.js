@@ -59,7 +59,11 @@ export default {
       const { results: daily } = await env.DB.prepare(
         "SELECT substr(datetime(at, '+9 hours'), 1, 10) AS day, COUNT(*) AS batches, SUM(COALESCE(json_extract(data, '$.pv'), 0)) AS pv, SUM(COALESCE(json_extract(data, '$.nv'), 0)) AS nv FROM batches GROUP BY day ORDER BY day"
       ).all();
-      return Response.json({ ...meta[0], daily, counts: Object.fromEntries(results.map((r) => [r.key, r.n])) });
+      // 日付ごとの時間帯（送信を受け取った日で分ける。日付をまたいだ送信は翌日に入ることがある）
+      const { results: hours } = await env.DB.prepare(
+        "SELECT substr(datetime(at, '+9 hours'), 1, 10) AS day, CAST(substr(j.key, 3) AS INTEGER) AS h, SUM(j.value) AS n FROM batches, json_each(batches.data) AS j WHERE j.key LIKE 'h:%' GROUP BY day, h"
+      ).all();
+      return Response.json({ ...meta[0], daily, hours, counts: Object.fromEntries(results.map((r) => [r.key, r.n])) });
     }
 
     if (req.method === "GET" && url.pathname === "/dashboard") {
@@ -115,7 +119,7 @@ button:focus-visible,input:focus-visible,th:focus-visible{outline:2px solid var(
 .kpi b{display:block;font-size:24px;line-height:1.25;font-variant-numeric:tabular-nums;font-weight:700}
 .kpi b small{font-size:13px;font-weight:600;color:var(--muted);margin-left:2px}
 /* 段 */
-.row2{display:grid;grid-template-columns:2fr 5fr 3fr 2.4fr;gap:10px}
+.row2{display:grid;grid-template-columns:3fr 5fr 2.6fr 3fr;gap:10px}
 .row3{display:grid;grid-template-columns:6fr 3fr 3fr;gap:10px}
 /* 縦棒 */
 .chart{display:flex;flex-direction:column;flex:1;min-height:120px}
@@ -125,7 +129,7 @@ button:focus-visible,input:focus-visible,th:focus-visible{outline:2px solid var(
 .plot .b.z i{height:0!important}
 .plot.dense{gap:2px}.plot.dense .b i{border-radius:3px 3px 0 0}
 .plot .b:hover i{filter:brightness(1.12)}
-.plot .b.pre i{background:var(--bar-soft)}
+.plot .b.ev i{background:var(--s2)}
 .plot .ymax{position:absolute;left:0;top:-2px;font-size:10px;color:var(--faint);pointer-events:none;background:var(--card);padding-right:4px;line-height:1}
 .plot .gl{position:absolute;left:0;right:0;top:0;border-top:1px dashed var(--line);pointer-events:none}
 .plot .vl{position:absolute;top:0;bottom:0;border-left:2px dashed var(--fg);opacity:.55;pointer-events:none}
@@ -138,9 +142,21 @@ button:focus-visible,input:focus-visible,th:focus-visible{outline:2px solid var(
 .ax.dense{gap:2px}
 .ax span{flex:1;min-width:0;text-align:center;font-size:10px;color:var(--faint);white-space:nowrap;overflow:visible}
 /* 100%積み上げ */
-.stack{display:flex;gap:2px;height:22px;border-radius:5px;overflow:hidden}
-.stack i{display:block;min-width:2px}
+.donut{display:flex;align-items:center;gap:14px;flex:1;min-height:0}
+.donut svg{flex:0 0 auto;width:min(132px,100%);height:auto;max-height:100%}
+.donut svg path{stroke:var(--card);stroke-width:2}
+.donut svg path:hover{filter:brightness(1.1)}
+.donut .leg{flex:1;min-width:0}
+.donut .c1{font-size:20px;font-weight:700;fill:var(--fg);font-variant-numeric:tabular-nums}
+.donut .c2{font-size:10px;fill:var(--muted)}
+.donut text{pointer-events:none}
+.pager{display:flex;align-items:center;gap:4px}
+.pager button{padding:1px 8px;font-size:12px;line-height:1.4}
+.pager button:disabled{opacity:.35;cursor:default}
+.pager span{font-size:11px;color:var(--muted);min-width:6.5em;text-align:center;font-variant-numeric:tabular-nums}
+select{font:inherit;font-size:12px;padding:2px 6px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
 .leg{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 8px;align-items:center;font-size:12px}
+.leg span{white-space:nowrap}
 .leg .sw{width:10px;height:10px;border-radius:3px}
 .leg .n{font-variant-numeric:tabular-nums;text-align:right}
 .leg .p{font-variant-numeric:tabular-nums;text-align:right;color:var(--muted);min-width:3.2em}
@@ -206,10 +222,10 @@ tbody tr:hover td{background:var(--bg)}
 <div id="out" hidden>
   <div class="kpis" id="kpis"></div>
   <div class="row2">
-    <section class="panel"><div class="ph"><h2>日別</h2><small>薄い色は開催前</small></div><div class="chart" id="daily"></div></section>
-    <section class="panel hours"><div class="ph"><h2>時間帯</h2><small>日本時間・ページを開いた回数</small></div><div class="chart" id="hours"></div></section>
+    <section class="panel"><div class="ph"><h2>日別</h2><div class="pager"><button class="alt" id="wprev" aria-label="前の週">‹</button><span id="wlabel"></span><button class="alt" id="wnext" aria-label="次の週">›</button></div></div><div class="chart" id="daily"></div><p class="note">ページを開いた回数・橙は開催日</p></section>
+    <section class="panel hours"><div class="ph"><h2>時間帯 <small>日本時間・ページを開いた回数</small></h2><select id="hday" aria-label="日付"></select></div><div class="chart" id="hours"></div></section>
     <section class="panel"><div class="ph"><h2>表示までの時間</h2><small>秒・30は30秒以上</small></div><div class="chart" id="ld"></div></section>
-    <section class="panel"><div class="ph"><h2>詳細をどこから開いたか</h2></div><div class="stack" id="stack"></div><div class="leg" id="leg"></div></section>
+    <section class="panel"><div class="ph"><h2>詳細をどこから開いたか</h2></div><div class="donut"><svg id="pie" viewBox="0 0 120 120" role="img" aria-label="詳細をどこから開いたかの割合"></svg><div class="leg" id="leg"></div></div></section>
   </div>
   <div class="row3">
     <section class="panel exh"><div class="ph"><h2>出展者ごと</h2><span><small>見出しで並び替え・お気に入りは追加−解除</small> <button class="alt" id="csv">CSVで保存</button></span></div>
@@ -285,6 +301,65 @@ function median(hist) { // hist: [[value, count]] を value 順に
   return null;
 }
 
+// 日別：1週間（月〜日）ずつ。データのない日は0で埋める
+var DAILY = [], week = 0;
+var dayStr = function (t) { return new Date(t).toISOString().slice(0, 10); };
+function renderDaily(daily) {
+  DAILY = daily;
+  var by = {}; daily.forEach(function (d) { by[d.day] = d; });
+  var start = window.EVENT_START || "", last = daily.length ? daily[daily.length - 1].day : dayStr(Date.now() + 9 * 3600e3);
+  if (start && start > last) last = start;
+  var lt = Date.parse(last + "T00:00:00Z"), dow = (new Date(lt).getUTCDay() + 6) % 7; // 月曜=0
+  var mon = lt - (dow + 7 * week) * 864e5, items = [];
+  for (var i = 0; i < 7; i++) {
+    var day = dayStr(mon + i * 864e5), d = by[day] || { pv: 0, nv: 0 }, md = day.slice(5).replace("-", "/");
+    var end = window.EVENT_END || (start ? dayStr(Date.parse(start + "T00:00:00Z") + 864e5) : ""); // 終わりの日がなければ2日間とみなす
+    var ev = start && day >= start && day <= end;
+    items.push({ v: d.pv, label: md, tip: md + "・はじめての端末 " + fmt(d.nv || 0) + "・ページを開いた回数", cls: ev ? "ev" : "" });
+  }
+  columns($("#daily"), items, { values: true });
+  $("#wlabel").textContent = items[0].label + "〜" + items[6].label;
+  var first = daily.length ? Date.parse(daily[0].day + "T00:00:00Z") : mon;
+  $("#wprev").disabled = first >= mon; $("#wnext").disabled = week === 0;
+}
+// 時間帯：全期間か、選んだ日だけ
+var HOURS = [];
+function renderHours(hours) {
+  HOURS = hours;
+  var sel = $("#hday"), cur = sel.value || "all";
+  var days = Array.from(new Set(hours.map(function (r) { return r.day; }))).sort();
+  sel.textContent = "";
+  var o = el("option", "", "全期間"); o.value = "all"; sel.append(o);
+  days.slice().reverse().forEach(function (d) { var op = el("option", "", d.slice(5).replace("-", "/")); op.value = d; sel.append(op); });
+  sel.value = days.indexOf(cur) >= 0 ? cur : "all";
+  drawHours();
+}
+function drawHours() {
+  var day = $("#hday").value, v = [];
+  for (var h = 0; h < 24; h++) v[h] = 0;
+  HOURS.forEach(function (r) { if ((day === "all" || r.day === day) && r.h >= 0 && r.h < 24) v[r.h] += r.n; });
+  if (!HOURS.length) for (var k = 0; k < 24; k++) v[k] = n("h:" + k);
+  columns($("#hours"), v.map(function (x, h) { return { v: x, label: String(h), tip: h + "時台" }; }), { dense: true });
+}
+// ドーナツ。items: [{v, color, tip}]
+function donut(svg, items, center, unit) {
+  svg.textContent = "";
+  var NS = "http://www.w3.org/2000/svg", tot = items.reduce(function (a, i) { return a + i.v; }, 0), R = 56, r = 34, a0 = -Math.PI / 2;
+  var mk = function (tag, attrs) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  if (!tot) svg.append(mk("circle", { cx: 60, cy: 60, r: (R + r) / 2, fill: "none", stroke: "var(--line)", "stroke-width": R - r }));
+  items.forEach(function (it) {
+    if (!it.v) return;
+    var a1 = a0 + it.v / tot * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0;
+    if (it.v === tot) a1 -= 0.0001;
+    var p = function (rad, a) { return (60 + rad * Math.cos(a)).toFixed(2) + " " + (60 + rad * Math.sin(a)).toFixed(2); };
+    var path = mk("path", { d: "M" + p(R, a0) + " A" + R + " " + R + " 0 " + big + " 1 " + p(R, a1) + " L" + p(r, a1) + " A" + r + " " + r + " 0 " + big + " 0 " + p(r, a0) + "Z", fill: it.color, "data-tip": it.tip });
+    svg.append(path); a0 = a1;
+  });
+  var t1 = mk("text", { x: 60, y: 62, "text-anchor": "middle", class: "c1" }); t1.textContent = center;
+  var t2 = mk("text", { x: 60, y: 76, "text-anchor": "middle", class: "c2" }); t2.textContent = unit;
+  svg.append(t1, t2);
+}
+
 function rowsFor() {
   return EX.map(function (e) {
     var id = e.id;
@@ -348,24 +423,19 @@ function render(x) {
   var kb = $("#kpis"); kb.textContent = "";
   kp.forEach(function (k) { var d = el("div", "kpi"); var b = el("b", "", k[1]); if (k[2] && med) b.append(el("small", "", k[2])); d.append(el("span", "", k[0]), b); kb.append(d); });
 
-  var start = (window.EVENT_START || "");
-  columns($("#daily"), (x.daily || []).map(function (d) {
-    return { v: d.pv, label: d.day.slice(5).replace("-", "/"), tip: d.day.slice(5).replace("-", "/") + "・はじめての端末 " + fmt(d.nv || 0) + "・ページを開いた回数", cls: start && d.day < start ? "pre" : "" };
-  }), { values: true });
-  var hs = []; for (var h = 0; h < 24; h++) hs.push({ v: n("h:" + h), label: String(h), tip: h + "時台" });
-  columns($("#hours"), hs, { dense: true });
+  renderDaily(x.daily || []);
+  renderHours(x.hours || []);
   columns($("#ld"), lds.map(function (l) { return { v: l[1], label: l[0] % 5 ? "" : String(l[0]), tip: l[0] === 30 ? "30秒以上" : l[0] + "秒" }; }),
     { dense: true, marker: med ? { at: med.i, text: "中央値 " + med.v + "秒" } : null });
 
   var fr = [["地図", n("from:map"), "--s1"], ["一覧", n("from:list"), "--s2"], ["共有リンク", n("from:link"), "--s3"]];
   var ft = fr.reduce(function (a, f) { return a + f[1]; }, 0);
-  var st = $("#stack"), lg = $("#leg"); st.textContent = ""; lg.textContent = "";
+  var lg = $("#leg"); lg.textContent = "";
+  donut($("#pie"), fr.map(function (f) { return { v: f[1], color: "var(" + f[2] + ")", tip: f[0] + "：" + fmt(f[1]) + "（" + pct(f[1], ft) + "）" }; }), fmt(ft), "回");
   fr.forEach(function (f) {
-    if (f[1]) { var i = el("i"); i.style.flex = String(f[1]); i.style.background = "var(" + f[2] + ")"; i.setAttribute("data-tip", f[0] + "：" + fmt(f[1]) + "（" + pct(f[1], ft) + "）"); st.append(i); }
     var sw = el("span", "sw"); sw.style.background = "var(" + f[2] + ")";
     lg.append(sw, el("span", "", f[0]), el("span", "n", fmt(f[1])), el("span", "p", pct(f[1], ft)));
   });
-  if (!ft) st.style.background = "var(--line)";
 
   var feats = [["タグで絞り込み", sum(/^t:/)], ["検索", n("q")], ["お気に入りだけ表示", n("scope:fav")], ["番号順に並べ替え", n("sort:space")],
     ["シャッフルに戻す", n("sort:shuffle")], ["平面図に切替", n("proj:flat")], ["立体図に切替", n("proj:iso")], ["？を開いた", n("help")]]
@@ -390,7 +460,7 @@ async function load() {
     if (r.status === 403) { store.set(""); throw new Error("合言葉が違います。もう一度入れてください"); }
     if (!r.ok) throw new Error("集計を読めませんでした（" + r.status + "）。少し待って「表示」を押し直してください");
     var x = await r.json();
-    try { var d = await (await fetch(SITE_DATA, { cache: "no-store" })).json(); EX = d.exhibitors || []; window.EVENT_START = (d.event && d.event.start) || ""; }
+    try { var d = await (await fetch(SITE_DATA, { cache: "no-store" })).json(); EX = d.exhibitors || []; window.EVENT_START = (d.event && d.event.start) || ""; window.EVENT_END = (d.event && d.event.end) || ""; }
     catch (e) { EX = []; }
     $("#login").hidden = true; $("#out").hidden = false; $("#acts").hidden = false;
     render(x);
@@ -400,5 +470,8 @@ $("#f").onsubmit = function (ev) { ev.preventDefault(); store.set($("#tok").valu
 $("#reload").onclick = load;
 $("#logout").onclick = function () { store.set(""); $("#out").hidden = true; $("#acts").hidden = true; $("#login").hidden = false; };
 $("#csv").onclick = downloadCsv;
+$("#wprev").onclick = function () { week++; renderDaily(DAILY); };
+$("#wnext").onclick = function () { if (week) { week--; renderDaily(DAILY); } };
+$("#hday").onchange = drawHours;
 load();
 </script></body></html>`;
