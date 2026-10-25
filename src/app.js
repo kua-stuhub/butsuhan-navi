@@ -91,7 +91,7 @@ function renderSheet() {
     <div class="grid">${list.length ? list.map(cardHTML).join("") :
       rosterHits().length ? "" : `<div class="empty">${S.scope === "fav" && !favs.size ? "お気に入りはまだありません。<br>カードの☆を押すと、ここに集まります。<br>この端末のブラウザにだけ保存されます。" : X.length ? "条件に合う出展者はいません。<br>タグを減らすか、検索語を変えてください。" : "掲載中の出展者はまだいません。<br>掲載が始まるまでお待ちください。"}</div>`}</div>
     ${rosterHits().length ? `<div class="roster"><p>お品書き未掲載（配置図より）</p>${rosterHits().map(([no, name]) => `<button type="button" class="rrow" data-goto="${esc(no)}"><b>${esc(no)}</b><span>${esc(name)}</span><small>${esc(roomOf(no))}</small></button>`).join("")}</div>` : ""}
-    <p class="foot">${S.sort === "shuffle" ? "並び順は見る人ごとにシャッフルされるので、特定の出展者がいつも上に来ることはありません。<br>" : ""}${updated ? `最終更新 ${esc(updated)}<br>` : ""}${org}有志による非公式の取り組みです。大学・学園祭実行委員会・物販イベント主催とは関係ありません。掲載内容の修正・削除は${contact}までご連絡ください。</p>`;
+    <p class="foot">${S.sort === "shuffle" ? "並び順は見る人ごとにシャッフルされるので、特定の出展者がいつも上に来ることはありません。<br>" : ""}${updated ? `最終更新 ${esc(updated)}<br>` : ""}${org}有志による非公式の取り組みです。京都芸術大学・学生会 大瓜生山祭2026運営・物販イベント主催とは関係ありません。掲載内容の修正・削除は${contact}までご連絡ください。</p>`;
   // 検索欄は作り直さずに残す（入力中に作り直すと、日本語の変換が壊れて文字が二重になる）
   const body = $("#sbody"), showQ = S.searchOpen || S.q;
   const keep = showQ ? body.querySelector(":scope > .search") : null;
@@ -668,7 +668,7 @@ function renderHelp() {
       <details class="policy" id="policyText"><summary>データの取り扱いについて</summary>${POLICY}</details>
     </div>` : ""}
     ${form ? `<h3>出展者の方へ</h3><a class="help-form" href="${esc(safeUrl(form))}" target="_blank" rel="noopener">掲載フォームを開く ›</a>` : ""}
-    <p class="help-note">有志による非公式の取り組みです。大学・学園祭実行委員会・物販イベント主催とは関係ありません。${updated ? `<br>最終更新 ${esc(updated)}` : ""}</p>`;
+    <p class="help-note">有志による非公式の取り組みです。京都芸術大学・学生会 大瓜生山祭2026運営・物販イベント主催とは関係ありません。${updated ? `<br>最終更新 ${esc(updated)}` : ""}</p>`;
 }
 function openHelp(section) {
   helpReturn = document.activeElement; renderHelp(); count("help");
