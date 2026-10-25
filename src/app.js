@@ -460,7 +460,8 @@ function initSheetDrag() {
 
 /* ---------- actions ---------- */
 /* 共有：出展者ごとのページ e/<id>/ を共有する（SNS ではそのブースの地図カードがプレビューに出る） */
-const shareUrl = (e) => new URL(`e/${encodeURIComponent(e.id)}/`, location.href.replace(/[?#].*$/, "")).href;
+// v はプレビュー画像の版。名前を変えたあとに共有したリンクは別のURLになり、SNS が古いプレビューを使い回さない
+const shareUrl = (e) => new URL(`e/${encodeURIComponent(e.id)}/${e.v ? `?v=${encodeURIComponent(e.v)}` : ""}`, location.href.replace(/[?#].*$/, "")).href;
 const shareText = (e) => `${e.name}（スペース${e.space || "—"}）｜${DATA?.event?.siteTitle || document.title}`;
 const postUrl = (e) => `https://x.com/intent/post?text=${encodeURIComponent(shareText(e))}&url=${encodeURIComponent(shareUrl(e))}`;
 function share(e) { navigator.share({ title: shareText(e), text: shareText(e), url: shareUrl(e) }).catch(() => {}); }

@@ -220,7 +220,9 @@ function siteCard(L, cfg) {
 }
 
 /* ---------- まとめて書き出す ---------- */
-// 返り値：{ site: "ogp/site.png?v=…", [出展者id]: "ogp/<id>.png?v=…" }。作れなかったものは入らない
+// 返り値：{ site: { img: "ogp/site-<v>.png", v }, [出展者id]: { img: "ogp/<id>-<v>.png", v } }。作れなかったものは入らない
+// 名前などが変わると v も変わり、画像のファイル名ごと別物になる（Discord や X はURLが同じだと前の画像を使い続けるため、
+// ?v= のようなクエリではなくファイル名で区別する）。前に共有されたリンクが画像切れにならないよう、ogp/<id>.png も置いておく
 export async function buildOgp({ root, out, cache, exhibitors, layout, cfg, sharp, warn }) {
   let opentype;
   try { opentype = (await import("opentype.js")).default; }
@@ -238,12 +240,13 @@ export async function buildOgp({ root, out, cache, exhibitors, layout, cfg, shar
     ...exhibitors.map((e) => ({ id: e.id, key: hash(base + JSON.stringify([e.name, e.space, e.tags])), svg: () => exhibitorCard(layout, e, cfg) }))];
   const urls = {};
   for (const j of jobs) {
-    const cached = path.join(cache, j.key + ".png"), file = `ogp/${j.id}.png`;
+    const cached = path.join(cache, j.key + ".png"), file = `ogp/${j.id}-${j.key}.png`;
     try {
       if (!(await fs.access(cached).then(() => true, () => false)))
         await sharp(Buffer.from(j.svg())).png({ palette: true, quality: 90 }).toFile(cached);
       await fs.copyFile(cached, path.join(out, file));
-      urls[j.id] = `${file}?v=${j.key}`;
+      await fs.copyFile(cached, path.join(out, `ogp/${j.id}.png`));
+      urls[j.id] = { img: file, v: j.key };
     } catch (err) { warn(`プレビュー画像（${j.id}）を作れませんでした: ${err.message}`); }
   }
   return urls;
