@@ -19,7 +19,7 @@ const MAX_BYTES = 16384, MAX_KEYS = 200, MAX_COUNT = 500;
 //   t:<タグ> 絞り込み / q 検索 / zero 絞り込みで0件 / scope:fav / sort:shuffle|space / proj:iso|flat
 //   dh:<id>:pre|am|mid|pm 詳細を開いた時間帯（開催前／当日の午前・昼・午後）
 //   help / imgerr / ld:<秒の目安> 最初の表示までの時間 / h:<0-23> 見られた時間帯（日本時間）
-const KEY = /^(pv|nv|q|zero|help|imgerr|scope:fav|sort:(shuffle|space)|proj:(iso|flat)|from:(map|list|link)|ld:\d{1,2}|h:\d{1,2}|(d|p|f\+|f-|s):[A-Za-z0-9_-]{1,40}|pg:[A-Za-z0-9_-]{1,40}:\d|dh:[A-Za-z0-9_-]{1,40}:(pre|am|mid|pm)|t:[^\s]{1,40})$/u;
+const KEY = /^(pv|nv|q|zero|help|imgerr|scope:fav|sort:(shuffle|space)|proj:(iso|flat)|from:(map|list|link)|ld:\d{1,2}|h:\d{1,2}|hd:\d{4}-\d{2}-\d{2}:\d{1,2}|(d|p|f\+|f-|s):[A-Za-z0-9_-]{1,40}|pg:[A-Za-z0-9_-]{1,40}:\d|dh:[A-Za-z0-9_-]{1,40}:(pre|am|mid|pm)|t:[^\s]{1,40})$/u;
 
 const cors = (env) => ({
   "Access-Control-Allow-Origin": env.SITE_ORIGIN || "*",
@@ -55,14 +55,22 @@ export default {
         "SELECT j.key AS key, SUM(j.value) AS n FROM batches, json_each(batches.data) AS j GROUP BY j.key ORDER BY j.key"
       ).all();
       const { results: meta } = await env.DB.prepare("SELECT COUNT(*) AS batches, MIN(at) AS first, MAX(at) AS last FROM batches").all();
-      // 日本時間の日付ごとの送信数・ページを開いた回数・はじめての端末の数
-      const { results: daily } = await env.DB.prepare(
+      // 日本時間の日付ごとの送信数・はじめての端末の数（受け取った日で分ける）
+      const { results: recv } = await env.DB.prepare(
         "SELECT substr(datetime(at, '+9 hours'), 1, 10) AS day, COUNT(*) AS batches, SUM(COALESCE(json_extract(data, '$.pv'), 0)) AS pv, SUM(COALESCE(json_extract(data, '$.nv'), 0)) AS nv FROM batches GROUP BY day ORDER BY day"
       ).all();
-      // 日付ごとの時間帯（送信を受け取った日で分ける。日付をまたいだ送信は翌日に入ることがある）
+      // 日付ごとの時間帯。hd:日付:時 はページを開いた日。古い h:時 は日付を持たないので受け取った日で代用
       const { results: hours } = await env.DB.prepare(
-        "SELECT substr(datetime(at, '+9 hours'), 1, 10) AS day, CAST(substr(j.key, 3) AS INTEGER) AS h, SUM(j.value) AS n FROM batches, json_each(batches.data) AS j WHERE j.key LIKE 'h:%' GROUP BY day, h"
+        "SELECT day, h, SUM(n) AS n FROM (" +
+        "SELECT substr(j.key, 4, 10) AS day, CAST(substr(j.key, 15) AS INTEGER) AS h, j.value AS n FROM batches, json_each(batches.data) AS j WHERE j.key LIKE 'hd:%' " +
+        "UNION ALL SELECT substr(datetime(at, '+9 hours'), 1, 10), CAST(substr(j.key, 3) AS INTEGER), j.value FROM batches, json_each(batches.data) AS j WHERE j.key LIKE 'h:%'" +
+        ") GROUP BY day, h ORDER BY day, h"
       ).all();
+      // 日別のページを開いた回数も、開いた日で数え直す（ページを開くたびに時間帯も1つ数えているので合計は同じ）
+      const by = {};
+      for (const r of recv) by[r.day] = { day: r.day, batches: r.batches, pv: 0, nv: r.nv };
+      for (const r of hours) (by[r.day] ||= { day: r.day, batches: 0, pv: 0, nv: 0 }).pv += r.n;
+      const daily = Object.values(by).sort((a, b) => (a.day < b.day ? -1 : 1));
       return Response.json({ ...meta[0], daily, hours, counts: Object.fromEntries(results.map((r) => [r.key, r.n])) });
     }
 
@@ -302,7 +310,7 @@ function median(hist) { // hist: [[value, count]] を value 順に
 }
 
 // 日別：1週間（月〜日）ずつ。データのない日は0で埋める
-var DAILY = [], week = 0;
+var DAILY = [], week = null;
 var dayStr = function (t) { return new Date(t).toISOString().slice(0, 10); };
 function renderDaily(daily) {
   DAILY = daily;
@@ -310,6 +318,10 @@ function renderDaily(daily) {
   var start = window.EVENT_START || "", last = daily.length ? daily[daily.length - 1].day : dayStr(Date.now() + 9 * 3600e3);
   if (start && start > last) last = start;
   var lt = Date.parse(last + "T00:00:00Z"), dow = (new Date(lt).getUTCDay() + 6) % 7; // 月曜=0
+  if (week === null) { // はじめは今日の週を出す（開催日の週は › で見られる）
+    var tt = Date.parse(dayStr(Date.now() + 9 * 3600e3) + "T00:00:00Z"), tdow = (new Date(tt).getUTCDay() + 6) % 7;
+    week = Math.max(0, Math.round(((lt - dow * 864e5) - (tt - tdow * 864e5)) / (7 * 864e5)));
+  }
   var mon = lt - (dow + 7 * week) * 864e5, items = [];
   for (var i = 0; i < 7; i++) {
     var day = dayStr(mon + i * 864e5), d = by[day] || { pv: 0, nv: 0 }, md = day.slice(5).replace("-", "/");
