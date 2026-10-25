@@ -558,7 +558,7 @@ function bindEvents() {
  * （ホーム画面に戻る・アプリやタブの切り替え・画面ロック）に、前回から30分以上たっていればまとめて送る。
  * 送れなかった分は残り、次の機会に送る。端末を見分ける番号は付けない。
  * 送り先は config.json の analytics.endpoint（Cloudflare Workers、worker/analytics.js）。空なら何もしない。 */
-const AN = { url: "", on: false }, SEND_GAP = 30 * 60 * 1000, T0 = performance.now();
+const AN = { url: "", on: false, ld: 0 }, SEND_GAP = 30 * 60 * 1000;
 function count(k) {
   if (!AN.on) return;
   const q = store.get("bn_q", {}); q[k] = (q[k] || 0) + 1; store.set("bn_q", q);
@@ -584,7 +584,9 @@ function flush(force) {
 function startAnalytics() {
   if (!AN.on) return;
   count("pv"); count(`h:${new Date(Date.now() + 9 * 3600e3).getUTCHours()}`);
-  count(`ld:${Math.min(30, Math.round((performance.now() - T0) / 1000))}`);
+  // この端末ではじめて数えるときだけ「nv」を1つ足す（端末の数の目安。番号などは付けない）
+  if (!store.get("bn_seen", 0)) { count("nv"); store.set("bn_seen", 1); }
+  count(`ld:${AN.ld}`);
   flush(false);
 }
 function setConsent(yes) {
@@ -598,6 +600,8 @@ function setConsent(yes) {
 function initAnalytics() {
   AN.url = /^https:\/\//.test(DATA?.analytics?.endpoint || "") ? DATA.analytics.endpoint : "";
   if (!AN.url) return;
+  // ページを開いてから地図と一覧が出るまでの秒数。同意のお知らせを読む時間は含めない
+  AN.ld = Math.min(30, Math.round(performance.now() / 1000));
   const c = store.get("bn_consent", null);
   AN.on = c === "yes";
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(false); });
@@ -621,7 +625,7 @@ function showConsent() {
 const POLICY = `<div class="policy-body">
 <p>KUA StuHUB（非公式）（以下「当団体」といいます）は、当団体が運営する「大瓜生山祭 物販ナビ（非公式）」（以下「本サイト」といいます）における閲覧状況に関する情報（以下「統計情報」といいます）の取り扱いについて、以下のとおり定めます。</p>
 <h4>第1条（取得する情報）</h4><p>当団体は、利用者が本サイト上で統計情報の取得に同意した場合に限り、次の情報を取得します。</p>
-<ol><li>各出展者の詳細情報およびお品書き画像の表示回数</li><li>各出展者のお気に入り登録および解除の回数、ならびに共有機能の利用回数</li><li>絞り込み・検索・並び替え等の機能の利用回数（検索語句は含みません）、出展者情報の表示元（地図、一覧または共有リンク）、閲覧した時間帯、ページの表示に要した時間、および画像の読み込みに失敗した回数</li></ol>
+<ol><li>各出展者の詳細情報およびお品書き画像の表示回数</li><li>各出展者のお気に入り登録および解除の回数、ならびに共有機能の利用回数</li><li>絞り込み・検索・並び替え等の機能の利用回数（検索語句は含みません）、出展者情報の表示元（地図、一覧または共有リンク）、閲覧した時間帯、ページの表示に要した時間、画像の読み込みに失敗した回数、および当該端末における初回の閲覧であるかどうか</li></ol>
 <h4>第2条（取得しない情報）</h4><p>当団体は、氏名、連絡先、位置情報、検索語句その他利用者個人を特定できる情報、および端末を識別する情報を取得しません。お気に入りの登録内容は、利用者の端末内にのみ保存され、当団体に送信されません。</p>
 <h4>第3条（利用目的）</h4><p>当団体は、統計情報を次の目的のために利用します。</p><ol><li>各出展者に対する、当該出展者に係る集計結果の提供</li><li>本サイトの利用状況の把握および改善</li><li>当団体の活動記録の作成</li></ol>
 <h4>第4条（第三者提供）</h4><p>当団体は、前条第1号に定める場合を除き、統計情報を第三者に提供しません。また、出展者ごとの集計結果の順位付けその他の比較情報を公開しません。</p>
