@@ -168,7 +168,8 @@ async function fromNotion(token, dbId) {
     cursor = j.has_more ? j.next_cursor : undefined;
   } while (cursor);
 
-  const text = (p) => (p?.title || p?.rich_text || []).map((t) => t.plain_text).join("");
+  const text = (p) => p?.select ? p.select.name : (p?.title || p?.rich_text || []).map((t) => t.plain_text).join("");
+  const fixedTags = new Set(cfg.categories.flatMap((c) => c.tags));
   const multi = (p) => (p?.multi_select || []).map((o) => o.name);
   const files = (p) => (p?.files || []).map((f) => ({ url: f.file?.url || f.external?.url, name: f.name || "" })).filter((f) => f.url);
 
@@ -176,9 +177,13 @@ async function fromNotion(token, dbId) {
   const list = [];
   for (const pg of pages) {
     const pr = pg.properties;
-    const name = clip(text(pr[P.name]), 60);
+    // フォームのプルダウン（Notion では選択の列）は「15　アニクエ」の形。番号と名前に分け、名前欄が空なら選んだ名前を使う
+    const rawSpace = text(pr[P.space]);
+    const picked = rawSpace.match(/^\s*([0-9０-９]+)[\s　]+(.+?)\s*$/);
+    const name = clip(text(pr[P.name]).trim() || (picked ? picked[2] : ""), 60);
     if (!name) { warn(`サークル名が空の行をスキップしました (${pg.url})`); continue; }
-    const tags = [...new Set(P.tags.flatMap((k) => multi(pr[k])))];
+    // 「その他」の自由入力は「スクイーズ、ミニアルバム」のように1つにまとまって届くので、区切りで分ける
+    const tags = [...new Set(P.tags.flatMap((k) => multi(pr[k])).flatMap((t) => fixedTags.has(t) ? [t] : t.split(/[、,，/／\s　]+/)).filter(Boolean))];
     const imgs = files(pr[P.images]).slice(0, 5);
     const images = (await pool(imgs, 4, async (f, i) => {
       const key = hash(`${pg.id}|${i}|${f.name}|${pg.last_edited_time}`);
@@ -188,7 +193,7 @@ async function fromNotion(token, dbId) {
     list.push({
       id: hash(pg.id),
       name,
-      space: normalizeSpace(text(pr[P.space])),
+      space: normalizeSpace(picked ? picked[1] : rawSpace),
       tags,
       comment: clip(text(pr[P.comment]), 200),
       sns: parseSns(text(pr[P.sns])),
@@ -253,6 +258,16 @@ const layoutJson = JSON.parse(await fs.readFile(path.join(ROOT, "data", "layout.
 const onMap = new Set(layoutJson.booths.map((b) => normalizeSpace(b[0])));
 for (const e of exhibitors) if (e.space && !onMap.has(e.space)) warn(`「${e.name}」のスペース ${e.space} は配置図にありません（地図に出ません）`);
 
+// 配置図の出展者リスト（data/roster.json）。読み取りが確定した名前（check なし・〓なし）だけ、未掲載のスペースに出す
+// 本番データのときは、投稿の名前と配置図の名前を照合する（ダミーデータは名前が合わないので照合しない）
+let roster = {};
+try {
+  const rj = JSON.parse(await fs.readFile(path.join(ROOT, "data", "roster.json"), "utf8"));
+  for (const r of rj.entries || []) if (r.name && !r.check && !r.name.includes("〓")) roster[normalizeSpace(r.no)] = r.name;
+  const flat = (t) => String(t).normalize("NFKC").toLowerCase().replace(/[\s・、。,.!?！？「」『』（）()&＆'’]/g, "");
+  if (live) for (const e of exhibitors) { const n = roster[e.space]; if (n && !flat(e.name).includes(flat(n)) && !flat(n).includes(flat(e.name))) warn(`スペース ${e.space}：投稿の名前「${e.name}」が配置図の「${n}」と違います（番号の書き間違いかも）`); }
+} catch (err) { if (err.code !== "ENOENT") warn(`data/roster.json を読めませんでした: ${err.message}`); }
+
 // 共有用のプレビュー画像。og:image は絶対URLが必要なので、config.json の site.url が空なら作らない
 const siteUrl = String(cfg.site?.url || "").replace(/\/?$/, "/");
 const okId = (id) => /^[A-Za-z0-9_-]+$/.test(id);
@@ -261,6 +276,9 @@ if (/^https?:\/\//.test(siteUrl)) {
   if (!sharp) await loadSharp();
   ogp = await buildOgp({ root: ROOT, out: OUT, cache: path.join(ROOT, ".cache", "ogp"), exhibitors: exhibitors.filter((e) => okId(e.id)), layout: layoutJson, cfg, sharp, warn });
 } else warn("config.json の site.url が空のため、共有用のプレビュー画像を作りません");
+
+// 共有リンクに付ける版（e/<id>/?v=…）。名前などが変わると別のURLになり、Discord や X が新しいプレビューを読みに行く
+for (const e of exhibitors) if (ogp[e.id]) e.v = ogp[e.id].v.slice(0, 6);
 
 const data = {
   mode: live ? "live" : "sample",
@@ -272,6 +290,7 @@ const data = {
   analytics: { endpoint: cfg.analytics?.endpoint || "" },
   categories,
   exhibitors,
+  roster,
 };
 await fs.writeFile(path.join(OUT, "data.json"), JSON.stringify(data));
 await fs.copyFile(path.join(ROOT, "data", "layout.json"), path.join(OUT, "layout.json"));
@@ -308,7 +327,7 @@ html = html
   .replaceAll("{{BYLINE}}", byline(cfg.org))
   .replaceAll("{{APP_JS}}", assets["app.js"])
   .replaceAll("{{STYLE_CSS}}", assets["style.css"])
-  .replaceAll("{{OG_EXTRA}}", ogMeta(siteUrl, ogp.site));
+  .replaceAll("{{OG_EXTRA}}", ogMeta(siteUrl, ogp.site?.img));
 await fs.writeFile(path.join(OUT, "index.html"), html);
 
 // 出展者ごとの共有ページ e/<id>/。SNS がプレビューを作るときに読む情報だけを書いて、人が開いたら本体の詳細へ移る
@@ -336,7 +355,7 @@ for (const e of exhibitors) {
 <meta property="og:title" content="${escXml(title)}">
 <meta property="og:description" content="${escXml(desc)}">
 <meta property="og:locale" content="ja_JP">
-${ogMeta(`${siteUrl}e/${e.id}/`, ogp[e.id] || ogp.site)}
+${ogMeta(`${siteUrl}e/${e.id}/${e.v ? `?v=${e.v}` : ""}`, (ogp[e.id] || ogp.site)?.img)}
 <meta http-equiv="refresh" content="0; url=${target}">
 <script>location.replace(${JSON.stringify(target)} + location.hash)</script>
 </head>
