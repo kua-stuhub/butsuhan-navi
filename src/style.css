@@ -105,6 +105,10 @@ a.byline:hover svg{opacity:1}
 .mailrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .mailrow .addr{font-size:15px;font-weight:700;user-select:all;-webkit-user-select:all;overflow-wrap:anywhere;min-width:0}
 .mailrow button{appearance:none;border:1px solid var(--fg);background:var(--fg);color:var(--bg);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-left:auto}
+.formcta{border:1px solid var(--line);border-radius:12px;padding:14px 16px;text-align:center;font-size:13px;line-height:1.7}
+.formcta p{margin:4px 0 12px;color:var(--muted)}
+.formcta .btn{display:block;padding:12px 16px;font-size:15px}
+.formcta small{display:block;margin-top:8px;font-size:11px;color:var(--muted)}
 .help-form{display:block;text-align:center;border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:700;font-size:14px;color:var(--fg);text-decoration:none}
 .help-note{font-size:11px;color:var(--muted);line-height:1.7;margin:16px 0 0}
 .maplegend{position:absolute;top:10px;left:10px;z-index:3;display:flex;gap:10px;font-size:11px;color:var(--muted);background:color-mix(in srgb,var(--card) 85%,transparent);border:1px solid var(--line);border-radius:8px;padding:4px 9px}
