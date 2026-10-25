@@ -9,6 +9,8 @@
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const safeUrl = (u) => (/^https?:\/\//i.test(u) ? u : "#");
+// 掲載フォーム（Tally）の隠しフィールド space に、プルダウンの選択肢と同じ文字を渡すと、その選択肢が選ばれた状態で開く
+const formUrl = (pick) => { const u = DATA.form.url; return pick ? `${u}${u.includes("?") ? "&" : "?"}space=${encodeURIComponent(pick)}` : u; };
 const short = (t) => t.replace("（陶芸・木工など）", "").replace("などのアート作品", "");
 const wide = () => matchMedia("(min-width:900px)").matches;
 const store = {
@@ -118,7 +120,10 @@ function renderDetail() {
   const e = S.detail, n = e.images.length;
   $("#headSlot").innerHTML = `<div class="dhead"><button type="button" class="back" id="back">‹ 一覧</button><h2>${esc(e.name)}</h2></div>`;
   if (e.vacant) { // a space nobody has listed yet（配置図の名前があれば見出しに出す）
-    const form = DATA?.form?.url ? `<p class="foot" style="margin-top:0">出展者の方へ：<a href="${esc(safeUrl(DATA.form.url))}" target="_blank" rel="noopener">${esc(DATA.form.label || "掲載フォーム")}</a>からお品書きを載せられます。</p>` : "";
+    // 配置図の名前が確定しているスペースは、フォームのプルダウン（「15　アニクエ」）を選んだ状態で開く
+    const pick = ROSTER[e.space] ? `${e.space}　${ROSTER[e.space]}` : "";
+    const form = DATA?.form?.url ? `<div class="formcta"><b>このスペースの出展者の方へ</b><p>掲載フォームから、お品書きの画像を送ると、運営の確認後にここに載ります。</p>
+      <a class="btn" href="${esc(safeUrl(formUrl(pick)))}" target="_blank" rel="noopener">お品書きを掲載する ›</a>${pick ? `<small>スペース「${esc(pick)}」を選んだ状態で開きます</small>` : ""}</div>` : "";
     $("#sbody").innerHTML = `<p class="dsum" id="dsum"><span><b>${esc(e.space)}</b> ${esc(roomOf(e.space))}</span>${ROSTER[e.space] ? "<span>配置図より</span>" : ""}</p>
       <div class="empty" style="margin-bottom:12px">このスペースのお品書きは、まだ掲載されていません。</div>${form}`;
     $("#sbody").scrollTop = 0; sizeGallery(); return;
