@@ -137,7 +137,7 @@ function renderDetail() {
     <div class="actions" style="margin-bottom:14px"><button type="button" class="btn" id="d-fav" aria-pressed="${favs.has(e.id)}">${favs.has(e.id) ? "★ お気に入り済み" : "☆ お気に入り"}</button>
       ${B.some((b) => String(b[0]) === e.space) ? `<button type="button" class="btn alt" id="d-map">地図で見る</button>` : ""}
       <button type="button" class="btn alt" id="d-share">共有</button>
-      ${navigator.share ? "" : `<a class="btn alt" id="d-post" href="${esc(postUrl(e))}" target="_blank" rel="noopener">Xでポスト</a>`}</div>
+      <a class="btn alt" id="d-post" href="${esc(postUrl(e))}" target="_blank" rel="noopener">Xでポスト</a></div>
     ${e.sns.length ? `<dl class="meta"><dt>SNS</dt><dd>${sns}</dd></dl>` : ""}`;
   $("#sbody").scrollTop = 0;
   sizeGallery();
@@ -463,7 +463,9 @@ function initSheetDrag() {
 // v はプレビュー画像の版。名前を変えたあとに共有したリンクは別のURLになり、SNS が古いプレビューを使い回さない
 const shareUrl = (e) => new URL(`e/${encodeURIComponent(e.id)}/${e.v ? `?v=${encodeURIComponent(e.v)}` : ""}`, location.href.replace(/[?#].*$/, "")).href;
 const shareText = (e) => `${e.name}（スペース${e.space || "—"}）｜${DATA?.event?.siteTitle || document.title}`;
-const postUrl = (e) => `https://x.com/intent/post?text=${encodeURIComponent(shareText(e))}&url=${encodeURIComponent(shareUrl(e))}`;
+// 投稿文にリンクとハッシュタグ（config.json の event.hashtags）を入れた状態で X の投稿画面を開く
+const postUrl = (e) => `https://x.com/intent/post?text=${encodeURIComponent(shareText(e))}&url=${encodeURIComponent(shareUrl(e))}`
+  + (DATA?.event?.hashtags?.length ? `&hashtags=${encodeURIComponent(DATA.event.hashtags.join(","))}` : "");
 // 共有ボタンは共有シートを開かず、リンクをコピーして「コピーしました」のトーストを出す
 function share(e) {
   const url = shareUrl(e), fallback = () => prompt("このリンクをコピーしてください", url);
