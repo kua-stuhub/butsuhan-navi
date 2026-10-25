@@ -467,8 +467,27 @@ function initSheetDrag() {
 const shareUrl = (e) => new URL(`e/${encodeURIComponent(e.id)}/${e.v ? `?v=${encodeURIComponent(e.v)}` : ""}`, location.href.replace(/[?#].*$/, "")).href;
 const shareText = (e) => `${e.name}（スペース${e.space || "—"}）｜${DATA?.event?.siteTitle || document.title}`;
 // 投稿文にリンクとハッシュタグ（config.json の event.hashtags）を入れた状態で X の投稿画面を開く
+const tags = () => DATA?.event?.hashtags || [];
 const postUrl = (e) => `https://x.com/intent/post?text=${encodeURIComponent(shareText(e))}&url=${encodeURIComponent(shareUrl(e))}`
-  + (DATA?.event?.hashtags?.length ? `&hashtags=${encodeURIComponent(DATA.event.hashtags.join(","))}` : "");
+  + (tags().length ? `&hashtags=${encodeURIComponent(tags().join(","))}` : "");
+// スマホで x.com の投稿URLを開くと、Xアプリが立ち上がったうえで中のブラウザにWeb版の投稿画面が出てしまう。
+// そこでスマホではアプリの投稿画面を直接開き、アプリが入っていなければWeb版に切り替える
+const postMsg = (e) => [shareText(e), shareUrl(e), tags().map((t) => `#${t}`).join(" ")].filter(Boolean).join("\n");
+function postToX(e) {
+  const ua = navigator.userAgent, web = postUrl(e);
+  if (/Android/i.test(ua)) {
+    location.href = `intent://post?message=${encodeURIComponent(postMsg(e))}#Intent;scheme=twitter;package=com.twitter.android;S.browser_fallback_url=${encodeURIComponent(web)};end`;
+    return true;
+  }
+  if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
+    let left = false; const away = () => { left = true; };
+    document.addEventListener("visibilitychange", away, { once: true }); addEventListener("pagehide", away, { once: true });
+    location.href = `twitter://post?message=${encodeURIComponent(postMsg(e))}`;
+    setTimeout(() => { if (!left && document.visibilityState === "visible") location.href = web; }, 1500);
+    return true;
+  }
+  return false; // PC はリンクのとおり新しいタブで Web 版を開く
+}
 // 共有ボタンは共有シートを開かず、リンクをコピーして「コピーしました」のトーストを出す
 function share(e) {
   const url = shareUrl(e), fallback = () => prompt("このリンクをコピーしてください", url);
@@ -506,7 +525,7 @@ function bindEvents() {
     const pgb = t.closest("[data-page]"); if (pgb && S.detail) { openLightbox(S.detail, +pgb.dataset.page); return; }
     if (t.closest("#d-fav")) { toggleFav(S.detail.id); return; }
     if (t.closest("#d-share")) { count(`s:${S.detail.id}`); share(S.detail); return; }
-    if (t.closest("#d-post")) { count(`s:${S.detail.id}`); return; }
+    if (t.closest("#d-post")) { count(`s:${S.detail.id}`); if (postToX(S.detail)) ev.preventDefault(); return; }
     if (t.closest("#d-map")) { if (!wide()) setSnap(0); else focusBooth(S.detail.space); return; }
     const cat = t.closest("[data-cat]"); if (cat) { S.openCat = S.openCat === cat.dataset.cat ? null : cat.dataset.cat; renderSheet(); return; }
     if (t.closest("#b-sort")) { S.sort = S.sort === "shuffle" ? "space" : "shuffle"; store.set("bn_sort", S.sort); count(`sort:${S.sort}`); renderSheet(); return; }
