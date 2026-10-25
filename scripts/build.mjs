@@ -277,6 +277,9 @@ if (/^https?:\/\//.test(siteUrl)) {
   ogp = await buildOgp({ root: ROOT, out: OUT, cache: path.join(ROOT, ".cache", "ogp"), exhibitors: exhibitors.filter((e) => okId(e.id)), layout: layoutJson, cfg, sharp, warn });
 } else warn("config.json の site.url が空のため、共有用のプレビュー画像を作りません");
 
+// 共有リンクに付ける版（e/<id>/?v=…）。名前などが変わると別のURLになり、Discord や X が新しいプレビューを読みに行く
+for (const e of exhibitors) if (ogp[e.id]) e.v = ogp[e.id].v.slice(0, 6);
+
 const data = {
   mode: live ? "live" : "sample",
   generatedAt: new Date().toISOString(),
@@ -324,7 +327,7 @@ html = html
   .replaceAll("{{BYLINE}}", byline(cfg.org))
   .replaceAll("{{APP_JS}}", assets["app.js"])
   .replaceAll("{{STYLE_CSS}}", assets["style.css"])
-  .replaceAll("{{OG_EXTRA}}", ogMeta(siteUrl, ogp.site));
+  .replaceAll("{{OG_EXTRA}}", ogMeta(siteUrl, ogp.site?.img));
 await fs.writeFile(path.join(OUT, "index.html"), html);
 
 // 出展者ごとの共有ページ e/<id>/。SNS がプレビューを作るときに読む情報だけを書いて、人が開いたら本体の詳細へ移る
@@ -352,7 +355,7 @@ for (const e of exhibitors) {
 <meta property="og:title" content="${escXml(title)}">
 <meta property="og:description" content="${escXml(desc)}">
 <meta property="og:locale" content="ja_JP">
-${ogMeta(`${siteUrl}e/${e.id}/`, ogp[e.id] || ogp.site)}
+${ogMeta(`${siteUrl}e/${e.id}/${e.v ? `?v=${e.v}` : ""}`, (ogp[e.id] || ogp.site)?.img)}
 <meta http-equiv="refresh" content="0; url=${target}">
 <script>location.replace(${JSON.stringify(target)} + location.hash)</script>
 </head>
