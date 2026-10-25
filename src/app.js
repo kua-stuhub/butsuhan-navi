@@ -59,6 +59,9 @@ const isMarker = (no) => !/^\d+$/.test(String(no)); // 受付・フォトブー�
 const visible = () => X.filter((e) => (S.scope === "all" || favs.has(e.id)) && matches(e));
 
 const star = `<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z" stroke-linejoin="round"/></svg>`;
+const pinIco = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>`;
+const linkIco = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>`;
+const xIco = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.2 2.5h3.4l-7.4 8.4 8.7 11.6h-6.8l-5.3-7-6.1 7H1.3l7.9-9L.9 2.5h7l4.8 6.4zm-1.2 18h1.9L7.1 4.4H5.1z"/></svg>`;
 const searchIco = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`;
 
 /* ---------- sheet: list ---------- */
@@ -134,10 +137,10 @@ function renderDetail() {
     ${n ? `<div class="gallery" id="gallery">${e.images.map((im, i) => `<button type="button" data-page="${i}" aria-label="お品書き ${i + 1}枚目を拡大"><img src="${esc(im.t)}" alt="${esc(e.name)}のお品書き ${i + 1}枚目" width="${im.w}" height="${im.h}" decoding="async">${n > 1 ? `<span class="pg">${i + 1}/${n}</span>` : ""}</button>`).join("")}</div>`
       : `<div class="empty" style="margin-bottom:12px">お品書きは準備中です</div>`}
     ${e.comment ? `<dl class="meta"><dt>ひとこと</dt><dd>${esc(e.comment)}</dd></dl>` : ""}
-    <div class="actions" style="margin-bottom:14px"><button type="button" class="btn" id="d-fav" aria-pressed="${favs.has(e.id)}">${favs.has(e.id) ? "★ お気に入り済み" : "☆ お気に入り"}</button>
-      ${B.some((b) => String(b[0]) === e.space) ? `<button type="button" class="btn alt" id="d-map">地図で見る</button>` : ""}
-      <button type="button" class="btn alt" id="d-share">共有</button>
-      <a class="btn alt" id="d-post" href="${esc(postUrl(e))}" target="_blank" rel="noopener">Xでポスト</a></div>
+    <div class="actions dact" style="margin-bottom:14px"><button type="button" class="btn" id="d-fav" aria-pressed="${favs.has(e.id)}">${favs.has(e.id) ? "★ お気に入り" : "☆ お気に入り"}</button>
+      ${B.some((b) => String(b[0]) === e.space) ? `<button type="button" class="btn alt ico" id="d-map" aria-label="地図で見る" title="地図で見る">${pinIco}</button>` : ""}
+      <button type="button" class="btn alt" id="d-share" aria-label="共有（リンクをコピー）">${linkIco}<span class="lbl">共有</span></button>
+      <a class="btn alt" id="d-post" href="${esc(postUrl(e))}" target="_blank" rel="noopener" aria-label="Xでポスト">${xIco}<span class="lbl">ポスト</span></a></div>
     ${e.sns.length ? `<dl class="meta"><dt>SNS</dt><dd>${sns}</dd></dl>` : ""}`;
   $("#sbody").scrollTop = 0;
   sizeGallery();
