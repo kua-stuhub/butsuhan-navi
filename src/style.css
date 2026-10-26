@@ -3,7 +3,7 @@
 :root{
   --bg:#ECEDEF; --surface:#F4F5F6; --card:#FFFFFF; --fg:#1F1E1C; --muted:#6B6E73; --line:#D3D6DA;
   /* 地図は2026年の配置図（ベージュの床・紺の壁・朱の枠の机）に色を合わせる。画面のほかの部分はグレーのまま */
-  --map-bg:#D9D3C7; --map-path:#DDD7CC; --map-floor:#EBE7DF; --map-wall:#6F7290; --map-label:#3E405C; --booth-top:#F0DDD4; --booth-side:#DFC0B3; --booth-side2:#D2AE9F; --booth-stroke:#BE7F74; --marker:#DCEBF8; --marker-stroke:#30599F;
+  --map-bg:#D9D3C7; --map-path:#DDD7CC; --map-floor:#EBE7DF; --map-wall:#6F7290; --map-label:#3E405C; --booth-top:#E8CABD; --booth-side:#D7B09F; --booth-side2:#CA9F8D; --booth-stroke:#B77265; --marker:#DCEBF8; --marker-stroke:#30599F;
   --accent:#C8553D; --accent-ink:#FFFFFF; --fav:#D9A21B;
   --f-body:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Yu Gothic","Meiryo",sans-serif;
   --f-mono:"Barlow","Helvetica Neue",Arial,sans-serif;
