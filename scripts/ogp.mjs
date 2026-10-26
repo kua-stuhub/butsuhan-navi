@@ -19,13 +19,24 @@ const hash = (s) => crypto.createHash("sha1").update(s).digest("hex").slice(0, 1
 
 /* ---------- 文字 ---------- */
 let JP_B, JP_M, NUM;
-const adv = (font, s, size) => font.getAdvanceWidth(s, size, { kerning: true });
-const text = (font, s, x, y, size, fill) => `<path fill="${fill}" d="${font.getPath(s, x, y, size, { kerning: true }).toPathData(1)}"/>`;
+// フォントに下付き数字（「O₃」の₃など）が無いので、ふつうの数字を小さく下げて描く
+const SUB = "₀₁₂₃₄₅₆₇₈₉", SUB_S = .62, SUB_DY = .14;
+const runs = (s) => (s.match(/[₀-₉]+|[^₀-₉]+/gu) || []).map((t) => SUB.includes(t[0]) ? { t: [...t].map((c) => SUB.indexOf(c)).join(""), sub: true } : { t, sub: false });
+const adv = (font, s, size) => runs(s).reduce((w, r) => w + font.getAdvanceWidth(r.t, r.sub ? size * SUB_S : size, { kerning: true }), 0);
+const text = (font, s, x, y, size, fill) => {
+  let d = "";
+  for (const r of runs(s)) {
+    const sz = r.sub ? size * SUB_S : size;
+    d += font.getPath(r.t, x, r.sub ? y + size * SUB_DY : y, sz, { kerning: true }).toPathData(1);
+    x += font.getAdvanceWidth(r.t, sz, { kerning: true });
+  }
+  return `<path fill="${fill}" d="${d}"/>`;
+};
 
 // 日本語は文字ごと、英数字は単語ごとに折り返す。行頭に来てはいけない記号は前の行にぶら下げる。
 // 空白のあとが短ければ、空白の位置で改行する（「〜研究会 有／志サークル」のような切れ方を避ける）
 const NO_START = "、。，．・ー〜）」』】〕！？!?,.)]ぁぃぅぇぉっゃゅょァィゥェォッャュョ";
-const tokens = (s) => s.match(/[A-Za-z0-9'&\-]+|\s+|./gu) || [];
+const tokens = (s) => s.match(/[A-Za-z0-9₀-₉'&\-]+|\s+|./gu) || [];
 function wrap(font, s, size, maxW) {
   const lines = []; let cur = "";
   for (const t of tokens(s)) {
