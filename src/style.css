@@ -3,18 +3,18 @@
 :root{
   --bg:#ECEDEF; --surface:#F4F5F6; --card:#FFFFFF; --fg:#1F1E1C; --muted:#6B6E73; --line:#D3D6DA;
   /* 地図は2026年の配置図（ベージュの床・紺の壁・朱の枠の机）に色を合わせる。画面のほかの部分はグレーのまま */
-  --map-bg:#D9D3C7; --map-path:#DDD7CC; --map-floor:#EBE7DF; --map-wall:#6F7290; --map-label:#3E405C; --booth-top:#F0DDD4; --booth-side:#DFC0B3; --booth-side2:#D2AE9F; --booth-stroke:#BE7F74; --marker:#DCEBF8; --marker-stroke:#30599F;
+  --map-bg:#D9D3C7; --map-path:#DDD7CC; --map-floor:#EBE7DF; --map-wall:#6F7290; --map-label:#3E405C; --booth-top:#EBC6B8; --booth-side:#DBAE9E; --booth-side2:#CB9887; --booth-stroke:#AE6355; --booth-vacant:#CDB9B0; --marker:#DCEBF8; --marker-stroke:#30599F;
   --accent:#C8553D; --accent-ink:#FFFFFF; --fav:#D9A21B;
   --f-body:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI","Yu Gothic","Meiryo",sans-serif;
   --f-mono:"Barlow","Helvetica Neue",Arial,sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#17181A; --surface:#1E2022; --card:#232528; --fg:#ECEBE8; --muted:#9CA0A6; --line:#3A3D41;
-  --map-bg:#17182A; --map-path:#1A1B2E; --map-floor:#222439; --map-wall:#6A6E92; --map-label:#B9BCD8; --booth-top:#4E3633; --booth-side:#3F2C2A; --booth-side2:#352523; --booth-stroke:#A0645E; --marker:#22344F; --marker-stroke:#7EA2DB;
+  --map-bg:#17182A; --map-path:#1A1B2E; --map-floor:#222439; --map-wall:#6A6E92; --map-label:#B9BCD8; --booth-top:#6B443E; --booth-side:#563633; --booth-side2:#4A2E2B; --booth-stroke:#B8726A; --booth-vacant:#3D3F5A; --marker:#22344F; --marker-stroke:#7EA2DB;
   --accent:#E07257; --accent-ink:#1A0E0A; --fav:#E8B53A; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#17181A; --surface:#1E2022; --card:#232528; --fg:#ECEBE8; --muted:#9CA0A6; --line:#3A3D41;
-  --map-bg:#17182A; --map-path:#1A1B2E; --map-floor:#222439; --map-wall:#6A6E92; --map-label:#B9BCD8; --booth-top:#4E3633; --booth-side:#3F2C2A; --booth-side2:#352523; --booth-stroke:#A0645E; --marker:#22344F; --marker-stroke:#7EA2DB;
+  --map-bg:#17182A; --map-path:#1A1B2E; --map-floor:#222439; --map-wall:#6A6E92; --map-label:#B9BCD8; --booth-top:#6B443E; --booth-side:#563633; --booth-side2:#4A2E2B; --booth-stroke:#B8726A; --booth-vacant:#3D3F5A; --marker:#22344F; --marker-stroke:#7EA2DB;
   --accent:#E07257; --accent-ink:#1A0E0A; --fav:#E8B53A; color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -65,9 +65,11 @@ a.byline:hover svg{opacity:1}
 .booth .s2{fill:var(--booth-side2);stroke:var(--booth-stroke);stroke-width:.8}
 .booth text{font-family:var(--f-mono);font-weight:600;fill:var(--muted);pointer-events:none}
 .booth[data-space]{cursor:pointer}
-.booth.vacant .t{fill:var(--map-floor)}
-.booth.vacant .s1,.booth.vacant .s2{opacity:.55}
-.booth.has text{fill:var(--fg)}
+/* 未掲載は床の色＋点線の薄い枠、掲載済みは配置図の朱を濃いめに。ひと目で見分けられるように差をつける */
+.booth.vacant .t{fill:var(--map-floor);stroke:var(--booth-vacant);stroke-dasharray:3 2}
+.booth.vacant .s1,.booth.vacant .s2{fill:var(--map-floor);stroke:var(--booth-vacant)}
+.booth.vacant text{opacity:.55}
+.booth.has text{fill:var(--fg);font-weight:700}
 .booth.hit .t{fill:var(--accent)}
 .booth.hit .s1{fill:color-mix(in srgb,var(--accent) 75%,#000)}
 .booth.hit .s2{fill:color-mix(in srgb,var(--accent) 60%,#000)}
