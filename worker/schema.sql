@@ -5,3 +5,5 @@ CREATE TABLE IF NOT EXISTS batches (
   at   TEXT NOT NULL,   -- 受け取った日時（UTC、ISO形式）
   data TEXT NOT NULL    -- {"d:<出展者ID>": 回数, ...} の JSON
 );
+-- QRコードの一覧。Worker がはじめて使うときに自動で作るので、手で作らなくてよい
+CREATE TABLE IF NOT EXISTS qr_codes (code TEXT PRIMARY KEY, label TEXT NOT NULL, memo TEXT NOT NULL DEFAULT '', created TEXT NOT NULL);
