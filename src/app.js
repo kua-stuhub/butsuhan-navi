@@ -505,10 +505,19 @@ function syncUrl() {
   try { const u = new URL(location.href); S.detail && !S.detail.vacant ? u.searchParams.set("e", S.detail.id) : u.searchParams.delete("e"); history.replaceState(null, "", u); } catch {}
 }
 
+// 一覧から詳細を開くときに、一覧のスクロール位置とシートの高さを覚えておき、「‹ 一覧」で戻したときに元に戻す
+let listPos = null;
 function openDetail(e, fromMap, src) {
+  if (S.mode === "list") listPos = { top: $("#sbody").scrollTop, snap: S.snap };
   if (!e.vacant) { count(`d:${e.id}`); count(`dh:${e.id}:${dayPart()}`); count(`from:${src || (fromMap ? "map" : "list")}`); }
   S.mode = "detail"; S.detail = e; syncUrl(); renderSheet(); if (!wide()) S.snap = 1; sizeGallery(); placeSheet(); renderMap(); setTimeout(() => focusBooth(e.space), fromMap ? 0 : 80); }
-function backToList() { S.mode = "list"; S.detail = null; syncUrl(); renderSheet(); placeSheet(); renderMap(); }
+function backToList() {
+  S.mode = "list"; S.detail = null; syncUrl(); renderSheet();
+  if (listPos && !wide()) { S.snap = listPos.snap; sizeGallery(); }
+  placeSheet(); renderMap();
+  if (listPos) { const top = listPos.top; $("#sbody").scrollTop = top; requestAnimationFrame(() => ($("#sbody").scrollTop = top)); } // 画像の読み込みで高さが変わっても戻るよう、次の描画でもう一度
+  listPos = null;
+}
 function toggleFav(id) { count(`${favs.has(id) ? "f-" : "f+"}:${id}`); favs.has(id) ? favs.delete(id) : favs.add(id); store.set("bn_favs", [...favs]); renderSheet(); renderMap(); }
 function rerender() { renderSheet(); renderMap(); }
 
