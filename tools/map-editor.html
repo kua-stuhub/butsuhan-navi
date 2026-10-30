@@ -278,7 +278,7 @@ function toJson() {
     source: doc.source || "",
     ...(doc.paths?.length ? { paths: doc.paths } : {}),
     ...(doc.walls?.length ? { walls: doc.walls } : {}),
-    rooms: doc.rooms.map((r) => { const o = { name: r.name }; if (r.short) o.short = r.short; Object.assign(o, { x: R(r.x), y: R(r.y), w: R(r.w), h: R(r.h) }); if (r.lx != null) { o.lx = R(r.lx); o.ly = R(r.ly); } return o; }),
+    rooms: doc.rooms.map((r) => { const o = { name: r.name }; if (r.short) o.short = r.short; Object.assign(o, { x: R(r.x), y: R(r.y), w: R(r.w), h: R(r.h) }); if (r.lx != null) o.lx = R(r.lx); if (r.ly != null) o.ly = R(r.ly); return o; }), // 名前の位置は lx・ly の片方だけのこともある（NA402 は ly だけ）
     booths: doc.booths.map((b) => [b.no, R(b.x1), R(b.x2), R(b.y1), R(b.y2)]),
   };
 }
