@@ -317,10 +317,44 @@ const byline = (org = {}) => {
     ? `<a class="byline" href="${escXml(org.url)}" target="_blank" rel="noopener">${label}<svg width="9" height="9" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2h6v6M10 2 3 9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>`
     : `<span class="byline">${label}</span>`;
 };
+// 検索エンジン向け：正規URL・所有確認タグ・構造化データ（JSON-LD）。JSON-LD の中で </script> が閉じないよう < をエスケープする
+const jsonLd = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, "\\u003c")}</script>`;
+function seoMeta() {
+  const out = [];
+  const http = /^https?:\/\//.test(siteUrl);
+  if (http) out.push(`<link rel="canonical" href="${escXml(siteUrl)}">`);
+  if (cfg.site?.googleSiteVerification) out.push(`<meta name="google-site-verification" content="${escXml(cfg.site.googleSiteVerification)}">`);
+  const event = {
+    "@type": "Event",
+    name: `${ev.name}${ev.year}`,
+    ...(ev.start && { startDate: ev.start }),
+    ...(ev.end && { endDate: ev.end }),
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    ...(ev.venue && { location: { "@type": "Place", name: ev.venue } }),
+  };
+  out.push(jsonLd({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: ev.siteTitle,
+    alternateName: "物販ナビ",
+    description: ev.description,
+    inLanguage: "ja",
+    ...(http && { url: siteUrl }),
+    ...(cfg.org?.name && { publisher: { "@type": "Organization", name: cfg.org.name, ...(cfg.org.url && { url: cfg.org.url }) } }),
+    about: event,
+  }));
+  return out.join("\n");
+}
+// JavaScript を動かさない検索エンジンにも出展者名が読めるよう、noscript に一覧を置く
+const noscriptList = exhibitors.length
+  ? `<ul style="padding:0 16px 16px 32px">${[...exhibitors].sort((a, b) => String(a.space).localeCompare(String(b.space), "ja", { numeric: true })).map((e) => `<li>${escXml(e.space ? `${e.space} ` : "")}${escXml(e.name)}${e.tags.length ? `（${escXml(e.tags.join("・"))}）` : ""}</li>`).join("")}</ul>`
+  : "";
 let html = await fs.readFile(path.join(ROOT, "src", "index.html"), "utf8");
 html = html
   .replaceAll("{{TITLE}}", escXml(ev.siteTitle))
   .replaceAll("{{DESCRIPTION}}", escXml(ev.description))
+  .replaceAll("{{SEO_EXTRA}}", seoMeta())
+  .replaceAll("{{NOSCRIPT_LIST}}", noscriptList)
   .replaceAll("{{NAME}}", escXml(ev.name))
   .replaceAll("{{YEAR}}", escXml(ev.year))
   .replaceAll("{{DATES}}", escXml(ev.dates))
@@ -361,6 +395,14 @@ ${ogMeta(`${siteUrl}e/${e.id}/${e.v ? `?v=${e.v}` : ""}`, (ogp[e.id] || ogp.site
 </head>
 <body><p><a href="${target}">${escXml(ev.siteTitle)}で開く</a></p></body>
 </html>
+`);
+}
+// サイトマップ（Search Console に登録する）。出展者ページ e/<id>/ はトップへ移るだけのページなので載せない
+if (/^https?:\/\//.test(siteUrl)) {
+  await fs.writeFile(path.join(OUT, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>${escXml(siteUrl)}</loc><lastmod>${data.generatedAt}</lastmod></url>
+</urlset>
 `);
 }
 await fs.writeFile(path.join(OUT, ".nojekyll"), "");
