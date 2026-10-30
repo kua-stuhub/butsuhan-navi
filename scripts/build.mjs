@@ -303,6 +303,8 @@ for (const f of ["app.js", "style.css"]) {
   await fs.writeFile(path.join(OUT, f), body);
 }
 for (const f of ["favicon.svg"]) await fs.copyFile(path.join(ROOT, "src", f), path.join(OUT, f));
+// Google Search Console の所有確認ファイル（src/google*.html）はそのまま公開する
+for (const f of await fs.readdir(path.join(ROOT, "src"))) if (/^google[0-9a-f]+\.html$/.test(f)) await fs.copyFile(path.join(ROOT, "src", f), path.join(OUT, f));
 const ev = cfg.event;
 // ヘッダー右上の「by KUA StuHUB」。url が http(s) ならリンクにして別タブで開く
 const byline = (org = {}) => {
