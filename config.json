@@ -9,15 +9,20 @@
   },
   "site": {
     "_説明": "公開サイトのURL（最後は /）。共有したときのプレビュー画像（OGP）に使う。独自ドメインにしたらここを書き換える。空にするとプレビュー画像を作らない。",
-    "url": "https://kua-stuhub.github.io/butsuhan-navi/"
+    "url": "https://kua-stuhub.github.io/butsuhan-navi/",
+    "_googleSiteVerification": "Google Search Console の「HTMLタグ」で確認するときの content の値（meta タグ全体ではなく、content=\"…\" の中身だけ）。空なら出さない。",
+    "googleSiteVerification": ""
   },
   "event": {
     "name": "大瓜生山祭",
     "year": 2026,
     "dates": "10.31–11.01",
     "start": "2026-10-31",
+    "end": "2026-11-01",
+    "_venue": "会場名。検索エンジン向けの構造化データ（JSON-LD）に使う。",
+    "venue": "京都芸術大学 瓜生山キャンパス",
     "siteTitle": "大瓜生山祭 2026 物販ナビ（非公式）",
-    "description": "大瓜生山祭2026の有志物販に出展するサークル・作家のお品書きをまとめた、非公式のWebカタログです。",
+    "description": "京都芸術大学の学園祭「大瓜生山祭2026」（10/31–11/1）の有志物販「まーちばざーる」に出展するサークル・作家のお品書きと配置図をまとめた非公式Webカタログ。頒布物で絞り込み、地図でスペースを探せます。",
     "_hashtags": "「Xでポスト」で投稿文に付けるハッシュタグ（# は付けない）",
     "hashtags": ["大瓜生山祭2026", "まーちばざーる"]
   },
