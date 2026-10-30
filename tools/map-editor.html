@@ -16,13 +16,13 @@
 :root{
   --bg:#ECEDEF;--panel:#F7F7F8;--card:#FFFFFF;--fg:#1D1E20;--muted:#6B6E73;--line:#D5D7DB;--line2:#C3C6CB;
   --accent:#C8553D;--accent-ink:#fff;--sel:#2F6FDE;--warn:#B7791F;--bad:#C0392B;--ok:#2E7D4F;
-  --room:#E3E5E8;--room-stroke:#8C9096;--booth:#FFFFFF;--booth-stroke:#5D6066;
+  --room:#E3E5E8;--room-stroke:#8C9096;--wall:#3E405C;--booth:#FFFFFF;--booth-stroke:#5D6066;
   --f:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif;
   --f-num:"Barlow","Zen Kaku Gothic New",sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#17181A;--panel:#1F2023;--card:#26282B;--fg:#ECEDEF;--muted:#9A9DA3;--line:#35373B;--line2:#45484D;
-  --room:#2A2C30;--room-stroke:#7C8086;--booth:#34363A;--booth-stroke:#A3A6AC;--sel:#6E9BFF;
+  --room:#2A2C30;--room-stroke:#7C8086;--wall:#B9BCD8;--booth:#34363A;--booth-stroke:#A3A6AC;--sel:#6E9BFF;
 }}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
@@ -72,6 +72,13 @@ button,input,select{font:inherit;color:inherit}
 #stage.hasbg .g-booth rect{fill-opacity:.55}
 .g-room .hit{fill:none;stroke:transparent;pointer-events:stroke;cursor:move}
 .g-room text{fill:var(--muted);font:600 18px var(--f-num);letter-spacing:.04em;cursor:move}
+.g-path rect{fill:var(--room);fill-opacity:.55;stroke:var(--room-stroke);stroke-width:1;stroke-dasharray:5 4;vector-effect:non-scaling-stroke;pointer-events:none}
+.g-path .hit{fill:none;stroke:transparent;pointer-events:stroke;cursor:move}
+.g-path.sel rect{stroke:var(--sel);stroke-width:2.4}
+#stage.hasbg .g-path rect{fill-opacity:.2}
+.g-wall line{stroke:var(--wall);stroke-width:2.6;stroke-linecap:round;vector-effect:non-scaling-stroke;pointer-events:none}
+.g-wall .hit{stroke:transparent;pointer-events:stroke;cursor:move}
+.g-wall.sel line{stroke:var(--sel);stroke-width:3.2}
 .g-booth rect{fill:var(--booth);stroke:var(--booth-stroke);stroke-width:1;vector-effect:non-scaling-stroke}
 .g-booth text{fill:var(--fg);font:600 12px var(--f-num);pointer-events:none;dominant-baseline:central}
 .g-booth.recept rect{fill:var(--line)}
@@ -155,13 +162,15 @@ button,input,select{font:inherit;color:inherit}
     <button class="tool" data-tool="room" title="部屋を描く（R）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3.5" y="5" width="17" height="14" rx="1"/><path d="M3.5 9h17" opacity=".5"/></svg><kbd>R</kbd></button>
     <button class="tool" data-tool="booth" title="スペースを1つ描く（B）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="6" y="9" width="12" height="6" rx=".5"/></svg><kbd>B</kbd></button>
     <button class="tool" data-tool="row" title="スペースを並べて描く（S）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2.5" y="9" width="19" height="6" rx=".5"/><path d="M7.3 9v6M12 9v6M16.7 9v6"/></svg><kbd>S</kbd></button>
+    <button class="tool" data-tool="wall" title="壁を描く（W）。Shift で縦・横にそろえる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 18L20 6"/></svg><kbd>W</kbd></button>
+    <button class="tool" data-tool="path" title="通路を描く（P）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-dasharray="3 2.4"><rect x="3.5" y="8" width="17" height="8" rx="1"/></svg><kbd>P</kbd></button>
     <div class="tsep"></div>
     <button class="tool" data-tool="pan" title="画面を動かす（H／スペースを押しながらドラッグ）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V6.5a1.5 1.5 0 013 0V11m0-5.5V5a1.5 1.5 0 013 0v6m0-4.5a1.5 1.5 0 013 0V13c0 4-2.5 7-6.5 7S6 17.5 4.5 15l-1-1.8a1.4 1.4 0 012.3-1.5L8 13.5"/></svg><kbd>H</kbd></button>
     <button class="tool" id="t-grid" title="グリッドに吸着（G）" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 9h16M4 15h16M9 4v16M15 4v16"/></svg><kbd>G</kbd></button>
   </nav>
 
   <div class="stagewrap" id="wrap">
-    <svg id="stage" xmlns="http://www.w3.org/2000/svg"><g id="vp"><g id="bgl"></g><g id="gridl" class="grid"></g><g id="rooml"></g><g id="boothl"></g><g id="ovl"></g></g></svg>
+    <svg id="stage" xmlns="http://www.w3.org/2000/svg"><g id="vp"><g id="bgl"></g><g id="gridl" class="grid"></g><g id="pathl"></g><g id="rooml"></g><g id="walll"></g><g id="boothl"></g><g id="ovl"></g></g></svg>
     <div class="empty" id="empty">
       <div>
         <h2>配置図をつくる</h2>
@@ -183,7 +192,8 @@ button,input,select{font:inherit;color:inherit}
     <section class="sec">
       <h3>全体</h3>
       <div class="stats"><div><b id="st-r">0</b><span>部屋</span></div><div><b id="st-b">0</b><span>スペース</span></div><div><b id="st-max">—</b><span>番号の範囲</span></div></div>
-      <p class="muted" style="margin-top:8px" id="st-note"></p>
+      <p class="muted" style="margin-top:8px" id="st-wp"></p>
+      <p class="muted" style="margin-top:4px" id="st-note"></p>
       <div class="f" style="margin-top:10px">
         <label for="m-source">元の図</label><input id="m-source" placeholder="例：大瓜生山祭2026 物販 出店者配置図">
       </div>
@@ -195,7 +205,10 @@ button,input,select{font:inherit;color:inherit}
         <dt>Shift+クリック</dt><dd>複数選択に追加・解除</dd>
         <dt>空いた所をドラッグ</dt><dd>範囲で選択（部屋の中でも）</dd>
         <dt>部屋</dt><dd>枠線か名前をつかんで移動。Alt+名前で名前だけ移動</dd>
+        <dt>壁</dt><dd>線をつかんで移動。両端の□で長さ・向きを変える。描くとき Shift で縦・横にそろう</dd>
+        <dt>通路</dt><dd>点線の枠をつかんで移動。床だけ描く範囲（壁・名前なし）</dd>
         <dt>矢印キー</dt><dd>1ずつ移動（Shift で10）</dd>
+        <dt>T</dt><dd>縦横を入れ替え（複数なら列ごと90度回す）</dd>
         <dt>Ctrl+D</dt><dd>複製</dd>
         <dt>Delete</dt><dd>削除</dd>
         <dt>ホイール</dt><dd>拡大・縮小</dd>
@@ -237,7 +250,8 @@ const NOTION_MAX = 90; // Notion の「照合：番号」の数式で使って�
 
 /* ---------- 状態 ---------- */
 // 部屋 {id,t:"room",name,short,x,y,w,h,lx,ly} / スペース {id,t:"booth",no,x1,x2,y1,y2}
-let doc = { note: "", source: "", rooms: [], booths: [] };
+// 壁 {id,t:"wall",x1,y1,x2,y2}（配置図の紺の線） / 通路 {id,t:"path",x,y,w,h}（床だけ描く範囲）
+let doc = { note: "", source: "", rooms: [], booths: [], walls: [], paths: [] };
 let loaded = false;
 let sel = new Set();
 let tool = "select", snap = true, nid = 1;
@@ -246,12 +260,17 @@ const V = { s: 1, tx: 0, ty: 0 };
 const hist = [], fut = [];
 
 const newId = () => "i" + nid++;
-const all = () => [...doc.rooms, ...doc.booths];
+const all = () => [...doc.paths, ...doc.rooms, ...doc.walls, ...doc.booths];
 const byId = (id) => all().find((o) => o.id === id);
-const box = (o) => o.t === "room" ? { x1: o.x, y1: o.y, x2: o.x + o.w, y2: o.y + o.h } : { x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2 };
+const box = (o) => o.t === "room" || o.t === "path" ? { x1: o.x, y1: o.y, x2: o.x + o.w, y2: o.y + o.h }
+  : o.t === "wall" ? { x1: Math.min(o.x1, o.x2), y1: Math.min(o.y1, o.y2), x2: Math.max(o.x1, o.x2), y2: Math.max(o.y1, o.y2) }
+  : { x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2 };
 const setBox = (o, b) => {
+  // 壁は向きを保ったまま平行移動だけ（長さ・向きは両端の□で変える）
+  if (o.t === "wall") { const c = box(o), dx = Math.min(b.x1, b.x2) - c.x1, dy = Math.min(b.y1, b.y2) - c.y1; o.x1 += dx; o.x2 += dx; o.y1 += dy; o.y2 += dy; return; }
   const x1 = Math.min(b.x1, b.x2), x2 = Math.max(b.x1, b.x2), y1 = Math.min(b.y1, b.y2), y2 = Math.max(b.y1, b.y2);
   if (o.t === "room") { const dx = x1 - o.x, dy = y1 - o.y; if (o.lx != null && (dx || dy) && x2 - x1 === o.w && y2 - y1 === o.h) { o.lx += dx; o.ly += dy; } o.x = x1; o.y = y1; o.w = x2 - x1; o.h = y2 - y1; }
+  else if (o.t === "path") { o.x = x1; o.y = y1; o.w = x2 - x1; o.h = y2 - y1; }
   else { o.x1 = x1; o.x2 = x2; o.y1 = y1; o.y2 = y2; }
 };
 const sn = (v) => snap ? Math.round(v / GRID) * GRID : Math.round(v);
@@ -265,8 +284,8 @@ function fromJson(j) {
   nid = 1;
   doc = {
     note: j.note || "", source: j.source || "",
-    walls: Array.isArray(j.walls) ? j.walls.map((w) => w.map(Number)) : [], // 壁（配置図の線）。エディタでは編集せず、そのまま書き出す
-    paths: Array.isArray(j.paths) ? j.paths.map((p) => ({ x: +p.x, y: +p.y, w: +p.w, h: +p.h })) : [], // 通路（床だけ描く）。エディタでは編集せず、そのまま書き出す
+    walls: Array.isArray(j.walls) ? j.walls.map((w) => ({ id: newId(), t: "wall", x1: +w[0], y1: +w[1], x2: +w[2], y2: +w[3] })) : [],
+    paths: Array.isArray(j.paths) ? j.paths.map((p) => ({ id: newId(), t: "path", x: +p.x, y: +p.y, w: +p.w, h: +p.h })) : [],
     rooms: j.rooms.map((r) => ({ id: newId(), t: "room", name: r.name || "", short: r.short || "", x: +r.x, y: +r.y, w: +r.w, h: +r.h, lx: r.lx ?? null, ly: r.ly ?? null })),
     booths: j.booths.map((b) => ({ id: newId(), t: "booth", no: b[0], x1: +b[1], x2: +b[2], y1: +b[3], y2: +b[4] })),
   };
@@ -276,8 +295,8 @@ function toJson() {
   return {
     note: doc.note || "配置図の座標。単位は配置図の画像ピクセル。部屋は x,y,w,h、スペースは [番号, 左x, 右x, 上y, 下y]。tools/map-editor.html で編集できる。",
     source: doc.source || "",
-    ...(doc.paths?.length ? { paths: doc.paths } : {}),
-    ...(doc.walls?.length ? { walls: doc.walls } : {}),
+    ...(doc.paths.length ? { paths: doc.paths.map((p) => ({ x: R(p.x), y: R(p.y), w: R(p.w), h: R(p.h) })) } : {}),
+    ...(doc.walls.length ? { walls: doc.walls.map((w) => [R(w.x1), R(w.y1), R(w.x2), R(w.y2)]) } : {}),
     rooms: doc.rooms.map((r) => { const o = { name: r.name }; if (r.short) o.short = r.short; Object.assign(o, { x: R(r.x), y: R(r.y), w: R(r.w), h: R(r.h) }); if (r.lx != null) o.lx = R(r.lx); if (r.ly != null) o.ly = R(r.ly); return o; }), // 名前の位置は lx・ly の片方だけのこともある（NA402 は ly だけ）
     booths: doc.booths.map((b) => [b.no, R(b.x1), R(b.x2), R(b.y1), R(b.y2)]),
   };
@@ -299,7 +318,7 @@ function openImage(file) {
   im.onload = () => {
     bg = { url, w: im.naturalWidth, h: im.naturalHeight, op: +$("#op").value / 100 };
     $("#op-wrap").hidden = false;
-    if (!loaded) { doc = { note: "", source: "", rooms: [], booths: [] }; loaded = true; hist.length = fut.length = 0; lastSnap = snapshot(); setTool("room"); toast("下絵の上に、まず部屋を描いてください"); }
+    if (!loaded) { doc = { note: "", source: "", rooms: [], booths: [], walls: [], paths: [] }; loaded = true; hist.length = fut.length = 0; lastSnap = snapshot(); setTool("room"); toast("下絵の上に、まず部屋を描いてください"); }
     else toast("下絵を読み込みました");
     render(); fit();
   };
@@ -337,7 +356,7 @@ function save() { clearTimeout(saveT); saveT = setTimeout(() => store.set(DRAFT,
 
 /* ---------- 表示 ---------- */
 const stage = $("#stage"), vp = $("#vp");
-function applyView() { vp.setAttribute("transform", `translate(${V.tx},${V.ty}) scale(${V.s})`); document.querySelectorAll(".g-room .hit").forEach((h) => h.setAttribute("stroke-width", (10 / V.s).toFixed(2))); drawGrid(); drawOverlay(); }
+function applyView() { vp.setAttribute("transform", `translate(${V.tx},${V.ty}) scale(${V.s})`); document.querySelectorAll(".g-room .hit,.g-path .hit,.g-wall .hit").forEach((h) => h.setAttribute("stroke-width", (10 / V.s).toFixed(2))); drawGrid(); drawOverlay(); }
 function bounds() {
   let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
   all().forEach((o) => { const b = box(o); x1 = Math.min(x1, b.x1); y1 = Math.min(y1, b.y1); x2 = Math.max(x2, b.x2); y2 = Math.max(y2, b.y2); });
@@ -371,6 +390,9 @@ function render() {
   $("#empty").hidden = loaded; stage.classList.toggle("hasbg", !!bg);
   $("#bgl").innerHTML = bg ? `<image href="${bg.url}" x="0" y="0" width="${bg.w}" height="${bg.h}" opacity="${bg.op}" preserveAspectRatio="none"/>` : "";
   const iss = issues(); issueIds = new Set(iss.filter((i) => i.lv === "bad").flatMap((i) => i.ids));
+  const hw = (10 / V.s).toFixed(2);
+  $("#pathl").innerHTML = doc.paths.map((r) => `<g class="g-path${sel.has(r.id) ? " sel" : ""}" data-id="${r.id}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/><rect class="hit" stroke-width="${hw}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/></g>`).join("");
+  $("#walll").innerHTML = doc.walls.map((w) => `<g class="g-wall${sel.has(w.id) ? " sel" : ""}" data-id="${w.id}"><line x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}"/><line class="hit" stroke-width="${hw}" x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}"/></g>`).join("");
   $("#rooml").innerHTML = doc.rooms.map((r) => {
     const tx = r.lx ?? r.x + r.w / 2, ty = r.ly ?? r.y + r.h / 2;
     return `<g class="g-room${sel.has(r.id) ? " sel" : ""}" data-id="${r.id}"><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/><rect class="hit" stroke-width="${(10 / V.s).toFixed(2)}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/><text x="${tx}" y="${ty}" text-anchor="middle" font-size="${r.short ? 15 : 18}">${esc(r.name || "（名前なし）")}</text></g>`;
@@ -389,10 +411,12 @@ function drawOverlay() {
   const k = 1 / V.s;
   if (sel.size === 1) {
     const o = byId([...sel][0]);
-    if (o) { const b = box(o), r = 4.5 * k; [[b.x1, b.y1], [b.x2, b.y1], [b.x1, b.y2], [b.x2, b.y2]].forEach(([x, y], i) => h += `<rect class="handle" data-h="${i}" x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}" style="cursor:${i === 0 || i === 3 ? "nwse" : "nesw"}-resize"/>`); }
+    if (o?.t === "wall") { const r = 4.5 * k; [[o.x1, o.y1], [o.x2, o.y2]].forEach(([x, y], i) => h += `<rect class="handle" data-e="${i}" x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}" style="cursor:crosshair"/>`); }
+    else if (o) { const b = box(o), r = 4.5 * k; [[b.x1, b.y1], [b.x2, b.y1], [b.x1, b.y2], [b.x2, b.y2]].forEach(([x, y], i) => h += `<rect class="handle" data-h="${i}" x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}" style="cursor:${i === 0 || i === 3 ? "nwse" : "nesw"}-resize"/>`); }
   }
   if (marquee) h += `<rect class="marquee" x="${Math.min(marquee.x1, marquee.x2)}" y="${Math.min(marquee.y1, marquee.y2)}" width="${Math.abs(marquee.x2 - marquee.x1)}" height="${Math.abs(marquee.y2 - marquee.y1)}"/>`;
-  if (ghost) {
+  if (ghost && tool === "wall") h += `<line class="ghostline" style="stroke-width:2.6" x1="${ghost.x1}" y1="${ghost.y1}" x2="${ghost.x2}" y2="${ghost.y2}"/><text x="${ghost.x2 + 8 * k}" y="${ghost.y2 - 8 * k}" font-size="${12 * k}" fill="var(--accent)" font-family="Barlow">${Math.round(Math.hypot(ghost.x2 - ghost.x1, ghost.y2 - ghost.y1))}</text>`;
+  else if (ghost) {
     const x = Math.min(ghost.x1, ghost.x2), y = Math.min(ghost.y1, ghost.y2), w = Math.abs(ghost.x2 - ghost.x1), hh = Math.abs(ghost.y2 - ghost.y1);
     h += `<rect class="ghost" x="${x}" y="${y}" width="${w}" height="${hh}"/>`;
     h += `<text x="${x + w / 2}" y="${y - 6 * k}" text-anchor="middle" font-size="${12 * k}" fill="var(--accent)" font-family="Barlow">${Math.round(w)} × ${Math.round(hh)}</text>`;
@@ -404,7 +428,7 @@ function drawOverlay() {
 function renderSide(iss) {
   const items = [...sel].map(byId).filter(Boolean), insp = $("#insp");
   if (!loaded) insp.innerHTML = `<h3>選んだもの</h3><p class="muted">まだ配置図を開いていません。</p>`;
-  else if (!items.length) insp.innerHTML = `<h3>選んだもの</h3><p class="muted">部屋やスペースを押すと、ここで名前・番号・位置を直せます。</p>
+  else if (!items.length) insp.innerHTML = `<h3>選んだもの</h3><p class="muted">部屋・スペース・壁・通路を押すと、ここで名前・番号・位置を直せます。</p>
     <div class="acts"><button class="btn small" data-act="selall-b">スペースを全部選ぶ</button></div>`;
   else if (items.length === 1) {
     const o = items[0], b = box(o);
@@ -412,12 +436,21 @@ function renderSide(iss) {
       <div class="f"><label for="i-no">番号</label><input id="i-no" class="num" value="${esc(o.no)}" placeholder="例：12 / 受付"></div>
       <p class="muted" style="margin:6px 0 10px">数字以外（「受付」など）は押せない目印として表示されます。</p>
       ${xyFields(b)}
-      <div class="acts"><button class="btn small" data-act="dup">複製</button><button class="btn small" data-act="del">削除</button></div>`;
+      <div class="acts"><button class="btn small" data-act="rot" title="T">縦横を入れ替え</button><button class="btn small" data-act="dup">複製</button><button class="btn small" data-act="del">削除</button></div>`;
+    else if (o.t === "wall") { const f = (k, l, v) => `<div><label for="i-${k}">${l}</label><input id="i-${k}" type="number" value="${Math.round(v)}"></div>`;
+      insp.innerHTML = `<h3>壁</h3>
+      <div class="f4">${f("wx1", "始点 x", o.x1)}${f("wy1", "始点 y", o.y1)}${f("wx2", "終点 x", o.x2)}${f("wy2", "終点 y", o.y2)}</div>
+      <p class="muted" style="margin-top:6px">長さ ${Math.round(Math.hypot(o.x2 - o.x1, o.y2 - o.y1))}。両端の□をドラッグしても変えられます。</p>
+      <div class="acts"><button class="btn small" data-act="rot" title="T">縦横を入れ替え</button><button class="btn small" data-act="dup">複製</button><button class="btn small" data-act="del">削除</button></div>`; }
+    else if (o.t === "path") insp.innerHTML = `<h3>通路</h3>
+      <p class="muted" style="margin:0 0 10px">床だけ描く範囲です（壁や名前は出ません）。</p>
+      ${xyFields(b)}
+      <div class="acts"><button class="btn small" data-act="rot" title="T">縦横を入れ替え</button><button class="btn small" data-act="dup">複製</button><button class="btn small" data-act="del">削除</button></div>`;
     else insp.innerHTML = `<h3>部屋</h3>
       <div class="f"><label for="i-name">名前</label><input id="i-name" value="${esc(o.name)}" placeholder="例：NA410">
       <label for="i-short">短い名前</label><input id="i-short" value="${esc(o.short)}" placeholder="一覧に出す略称（任意）"></div>
       <div style="margin-top:10px">${xyFields(b)}</div>
-      <div class="acts"><button class="btn small" data-act="label-reset" ${o.lx == null ? "disabled" : ""}>名前の位置を中央に</button><button class="btn small" data-act="del">削除</button></div>
+      <div class="acts"><button class="btn small" data-act="rot" title="T">縦横を入れ替え</button><button class="btn small" data-act="label-reset" ${o.lx == null ? "disabled" : ""}>名前の位置を中央に</button><button class="btn small" data-act="del">削除</button></div>
       <p class="muted" style="margin-top:8px">名前の位置は、名前の文字を Alt を押しながらドラッグすると動かせます。</p>`;
   } else {
     const nb = items.filter((o) => o.t === "booth").length;
@@ -427,7 +460,7 @@ function renderSide(iss) {
       <h3 style="margin-top:14px">そろえる</h3>
       <div class="acts" style="margin-top:0"><button class="btn small" data-act="al-top">上端</button><button class="btn small" data-act="al-bottom">下端</button><button class="btn small" data-act="al-left">左端</button><button class="btn small" data-act="al-right">右端</button><button class="btn small" data-act="al-size">大きさ</button></div>
       <p class="muted" style="margin-top:6px">「大きさ」は最初に選んだものに合わせます。</p>
-      <div class="acts"><button class="btn small" data-act="dup">複製</button><button class="btn small" data-act="del">削除</button></div>`;
+      <div class="acts"><button class="btn small" data-act="rot" title="T">縦横を入れ替え</button><button class="btn small" data-act="dup">複製</button><button class="btn small" data-act="del">削除</button></div>`;
   }
   // チェック
   $("#iss-n").textContent = iss.length ? iss.length + " 件" : "";
@@ -437,7 +470,7 @@ function renderSide(iss) {
   window.__iss = iss;
   // 全体
   const nums = doc.booths.map((b) => b.no).filter((v) => typeof v === "number");
-  $("#st-r").textContent = doc.rooms.length; $("#st-b").textContent = doc.booths.filter((b) => isNum(b.no)).length;
+  $("#st-r").textContent = doc.rooms.length; $("#st-wp").textContent = `壁 ${doc.walls.length}・通路 ${doc.paths.length}`; $("#st-b").textContent = doc.booths.filter((b) => isNum(b.no)).length;
   $("#st-max").textContent = nums.length ? `${Math.min(...nums)}〜${Math.max(...nums)}` : "—";
   const mx = nums.length ? Math.max(...nums) : 0;
   $("#st-note").innerHTML = !mx ? "" : mx === NOTION_MAX ? `Notion の「照合：番号」の数式（1〜${NOTION_MAX}）と合っています。`
@@ -480,18 +513,33 @@ function issues() {
 /* ---------- 編集の操作 ---------- */
 function setTool(t) {
   tool = t; document.querySelectorAll(".tool[data-tool]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tool === t));
-  stage.classList.toggle("draw", t === "room" || t === "booth" || t === "row"); stage.classList.toggle("pan", t === "pan");
-  $("#hint").textContent = { select: "押して選ぶ・ドラッグで移動。部屋は枠線か名前をつかむ。空いた所をドラッグすると範囲選択", room: "ドラッグして部屋を描く", booth: `ドラッグしてスペースを描く（次の番号：${nextNo()}）`, row: "ドラッグした枠を等分して、スペースを並べる", pan: "ドラッグで画面を動かす" }[t];
+  stage.classList.toggle("draw", ["room", "booth", "row", "wall", "path"].includes(t)); stage.classList.toggle("pan", t === "pan");
+  $("#hint").textContent = { select: "押して選ぶ・ドラッグで移動。部屋は枠線か名前をつかむ。空いた所をドラッグすると範囲選択", room: "ドラッグして部屋を描く", booth: `ドラッグしてスペースを描く（次の番号：${nextNo()}）`, row: "ドラッグした枠を等分して、スペースを並べる", wall: "始点から終点へドラッグして壁を描く（Shift で縦・横にそろえる）", path: "ドラッグして通路（床だけの範囲）を描く", pan: "ドラッグで画面を動かす" }[t];
 }
-function del() { if (!sel.size) return; doc.rooms = doc.rooms.filter((o) => !sel.has(o.id)); doc.booths = doc.booths.filter((o) => !sel.has(o.id)); sel.clear(); commit(); render(); }
+function del() { if (!sel.size) return; for (const k of ["rooms", "booths", "walls", "paths"]) doc[k] = doc[k].filter((o) => !sel.has(o.id)); sel.clear(); commit(); render(); }
 function dup() {
   const items = [...sel].map(byId).filter(Boolean); if (!items.length) return;
   let n = nextNo(); const off = 10; sel.clear();
   items.forEach((o) => { const c = structuredClone(o); c.id = newId(); const b = box(o); setBox(c, { x1: b.x1 + off, y1: b.y1 + off, x2: b.x2 + off, y2: b.y2 + off });
-    if (c.t === "booth") { if (typeof c.no === "number") c.no = n++; doc.booths.push(c); } else { c.name += "（コピー）"; if (c.lx != null) { c.lx += off; c.ly += off; } doc.rooms.push(c); } sel.add(c.id); });
+    if (c.t === "booth") { if (typeof c.no === "number") c.no = n++; doc.booths.push(c); } else if (c.t === "wall") doc.walls.push(c); else if (c.t === "path") doc.paths.push(c); else { c.name += "（コピー）"; if (c.lx != null) { c.lx += off; c.ly += off; } doc.rooms.push(c); } sel.add(c.id); });
   commit(); render();
 }
 function nudge(dx, dy) { [...sel].map(byId).forEach((o) => { const b = box(o); setBox(o, { x1: b.x1 + dx, y1: b.y1 + dy, x2: b.x2 + dx, y2: b.y2 + dy }); if (o.t === "room" && o.lx != null) { o.lx += dx; o.ly += dy; } }); commit(); render(); }
+// 縦横を入れ替える：選んだものをまとめて、全体の中心で90度回す（1つなら机の縦長・横長が入れ替わる）
+function rotate() {
+  const items = [...sel].map(byId).filter(Boolean); if (!items.length) return;
+  const bs = items.map(box), cx = (Math.min(...bs.map((b) => b.x1)) + Math.max(...bs.map((b) => b.x2))) / 2, cy = (Math.min(...bs.map((b) => b.y1)) + Math.max(...bs.map((b) => b.y2))) / 2;
+  const rx = (x, y) => cx - (y - cy), ry = (x, y) => cy + (x - cx); // 時計回りに90度
+  const Q = (v) => Math.round(v * 10) / 10;
+  items.forEach((o, i) => {
+    if (o.t === "wall") { [o.x1, o.y1, o.x2, o.y2] = [Q(rx(o.x1, o.y1)), Q(ry(o.x1, o.y1)), Q(rx(o.x2, o.y2)), Q(ry(o.x2, o.y2))]; return; }
+    const b = bs[i], x1 = rx(b.x1, b.y1), y1 = ry(b.x1, b.y1), x2 = rx(b.x2, b.y2), y2 = ry(b.x2, b.y2);
+    if (o.t === "room" && o.lx != null) { const lx = o.lx; o.lx = Q(rx(lx, o.ly)); o.ly = Q(ry(lx, o.ly)); }
+    const n = { x1: Q(Math.min(x1, x2)), x2: Q(Math.max(x1, x2)), y1: Q(Math.min(y1, y2)), y2: Q(Math.max(y1, y2)) };
+    if (o.t === "room" || o.t === "path") { o.x = n.x1; o.y = n.y1; o.w = n.x2 - n.x1; o.h = n.y2 - n.y1; } else Object.assign(o, n);
+  });
+  commit(); render();
+}
 function renumber() {
   const start = parseNo($("#m-start").value), ord = $("#m-ord").value;
   if (typeof start !== "number") return toast("最初の番号は数字で入れてください");
@@ -547,8 +595,9 @@ stage.addEventListener("pointerdown", (e) => {
   stage.setPointerCapture(e.pointerId);
   const p = toW(e), t = e.target;
   if (e.button === 1 || e.button === 2 || tool === "pan" || spaceDown) { drag = { kind: "pan", sx: e.clientX, sy: e.clientY, tx: V.tx, ty: V.ty }; stage.classList.add("panning"); return; }
-  if (tool === "room" || tool === "booth" || tool === "row") { const x = sn(p.x), y = sn(p.y); ghost = { x1: x, y1: y, x2: x, y2: y }; drag = { kind: "draw" }; drawOverlay(); return; }
+  if (["room", "booth", "row", "wall", "path"].includes(tool)) { const x = sn(p.x), y = sn(p.y); ghost = { x1: x, y1: y, x2: x, y2: y }; drag = { kind: "draw" }; drawOverlay(); return; }
   // 選択
+  if (t.classList.contains("handle") && t.dataset.e != null) { drag = { kind: "wend", o: byId([...sel][0]), e: +t.dataset.e }; return; }
   if (t.classList.contains("handle")) { const o = byId([...sel][0]); drag = { kind: "resize", o, h: +t.dataset.h, b0: box(o) }; return; }
   const g = t.closest("[data-id]");
   if (g) {
@@ -566,7 +615,10 @@ stage.addEventListener("pointermove", (e) => {
   if (!drag) return;
   const p = toW(e);
   if (drag.kind === "pan") { V.tx = drag.tx + e.clientX - drag.sx; V.ty = drag.ty + e.clientY - drag.sy; applyView(); return; }
-  if (drag.kind === "draw") { ghost.x2 = sn(p.x); ghost.y2 = sn(p.y); drawOverlay(); return; }
+  if (drag.kind === "draw") { ghost.x2 = sn(p.x); ghost.y2 = sn(p.y); if (tool === "wall" && e.shiftKey) { if (Math.abs(ghost.x2 - ghost.x1) > Math.abs(ghost.y2 - ghost.y1)) ghost.y2 = ghost.y1; else ghost.x2 = ghost.x1; } drawOverlay(); return; }
+  if (drag.kind === "wend") { const o = drag.o, x = sn(p.x), y = sn(p.y), ox = drag.e ? o.x1 : o.x2, oy = drag.e ? o.y1 : o.y2;
+    let nx = x, ny = y; if (e.shiftKey) { if (Math.abs(x - ox) > Math.abs(y - oy)) ny = oy; else nx = ox; }
+    if (drag.e) { o.x2 = nx; o.y2 = ny; } else { o.x1 = nx; o.y1 = ny; } render(); return; }
   if (drag.kind === "move") {
     let dx = p.x - drag.p0.x, dy = p.y - drag.p0.y;
     if (!drag.moved && Math.hypot(dx, dy) * V.s < 3) return; drag.moved = true;
@@ -587,23 +639,30 @@ stage.addEventListener("pointermove", (e) => {
     sel = new Set(marquee.base);
     // スペースを優先して選ぶ。スペースが1つも入らないときだけ部屋を選ぶ
     const inside = (o) => { const b = box(o); return b.x1 >= m.x1 && b.x2 <= m.x2 && b.y1 >= m.y1 && b.y2 <= m.y2; };
-    const bs = doc.booths.filter(inside); (bs.length ? bs : doc.rooms.filter(inside)).forEach((o) => sel.add(o.id));
+    // 壁はスペースと一緒に選ぶ（区画ごと動かせるように）。部屋と通路は、ほかに何も入らないときだけ
+    const bs = [...doc.booths, ...doc.walls].filter(inside); (bs.length ? bs : [...doc.rooms, ...doc.paths].filter(inside)).forEach((o) => sel.add(o.id));
     render();
   }
 });
 stage.addEventListener("pointerup", () => {
   if (!drag) return;
   const k = drag.kind; stage.classList.remove("panning");
+  if (k === "draw" && tool === "wall") {
+    const g = ghost; ghost = null; drag = null;
+    if (Math.hypot(g.x2 - g.x1, g.y2 - g.y1) < 4) { drawOverlay(); return; }
+    const w = { id: newId(), t: "wall", x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2 }; doc.walls.push(w); sel = new Set([w.id]); commit(); render(); return;
+  }
   if (k === "draw") {
     const g = ghost; ghost = null;
     const b = { x1: Math.min(g.x1, g.x2), x2: Math.max(g.x1, g.x2), y1: Math.min(g.y1, g.y2), y2: Math.max(g.y1, g.y2) };
     if (b.x2 - b.x1 < 4 || b.y2 - b.y1 < 4) { drag = null; drawOverlay(); return; }
     if (tool === "room") { const r = { id: newId(), t: "room", name: "", short: "", x: b.x1, y: b.y1, w: b.x2 - b.x1, h: b.y2 - b.y1, lx: null, ly: null }; doc.rooms.push(r); sel = new Set([r.id]); commit(); render(); setTool("select"); setTimeout(() => $("#i-name")?.focus(), 20); }
+    else if (tool === "path") { const o = { id: newId(), t: "path", x: b.x1, y: b.y1, w: b.x2 - b.x1, h: b.y2 - b.y1 }; doc.paths.push(o); sel = new Set([o.id]); commit(); render(); }
     else if (tool === "booth") { const o = { id: newId(), t: "booth", no: nextNo(), ...b }; doc.booths.push(o); sel = new Set([o.id]); commit(); render(); setTool("booth"); }
     else { drag = null; drawOverlay(); openRow(b); return; }
   }
   if (k === "move" && drag.moved) commit();
-  if (k === "resize" || k === "label") commit();
+  if (k === "resize" || k === "label" || k === "wend") commit();
   if (k === "marquee") { marquee = null; render(); }
   drag = null;
 });
@@ -620,6 +679,7 @@ $("#insp").addEventListener("change", (e) => {
   if (id === "i-no") o.no = parseNo(v);
   else if (id === "i-name") o.name = v.trim();
   else if (id === "i-short") o.short = v.trim();
+  else if (/^i-w[xy][12]$/.test(id)) { const n = Number(v); if (!isFinite(n)) return; o[id.slice(3)] = n; }
   else if (/^i-(x1|y1|w|h)$/.test(id)) {
     const b = box(o), n = Number(v); if (!isFinite(n)) return;
     if (id === "i-x1") setBox(o, { ...b, x1: n, x2: n + b.x2 - b.x1 }); if (id === "i-y1") setBox(o, { ...b, y1: n, y2: n + b.y2 - b.y1 });
@@ -629,7 +689,7 @@ $("#insp").addEventListener("change", (e) => {
 });
 $("#insp").addEventListener("click", (e) => {
   const a = e.target.closest("[data-act]")?.dataset.act; if (!a) return;
-  if (a === "del") del(); if (a === "dup") dup(); if (a === "renum") renumber();
+  if (a === "del") del(); if (a === "dup") dup(); if (a === "rot") rotate(); if (a === "renum") renumber();
   if (a === "selall-b") { sel = new Set(doc.booths.map((b) => b.id)); render(); }
   if (a === "label-reset") { const o = byId([...sel][0]); o.lx = o.ly = null; commit(); render(); }
   if (a.startsWith("al-")) align(a.slice(3));
@@ -654,7 +714,7 @@ function renderPreview() {
   const src = doc.rooms.length ? doc.rooms.map((r) => ({ x1: r.x, y1: r.y, x2: r.x + r.w, y2: r.y + r.h })) : doc.booths;
   src.forEach((r) => [[r.x1, r.y1], [r.x2, r.y1], [r.x1, r.y2], [r.x2, r.y2]].forEach(([x, y]) => [0, WALL].forEach((z) => { const [a, b] = P(x, y, z); mnx = Math.min(mnx, a); mxx = Math.max(mxx, a); mny = Math.min(mny, b); mxy = Math.max(mxy, b); })));
   const pad = 40;
-  (doc.paths || []).forEach((r) => (out += `<polygon class="pv-floor" opacity=".6" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
+  doc.paths.forEach((r) => (out += `<polygon class="pv-floor" opacity=".6" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
   doc.rooms.forEach((r) => (out += `<polygon class="pv-floor" points="${pts(quad(r.x, r.y, r.x + r.w, r.y + r.h, 0))}"/>`));
   doc.booths.slice().sort((a, b) => P((a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2)[1] - P((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2)[1]).forEach((b) => {
     if (pvIso) out += `<polygon class="pv-s1" points="${pts([P(b.x1, b.y2, 0), P(b.x2, b.y2, 0), P(b.x2, b.y2, Z), P(b.x1, b.y2, Z)])}"/><polygon class="pv-s2" points="${pts([P(b.x1, b.y1, 0), P(b.x1, b.y2, 0), P(b.x1, b.y2, Z), P(b.x1, b.y1, Z)])}"/>`;
@@ -662,10 +722,10 @@ function renderPreview() {
     const [cx, cy] = P((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2, Z), fs = Math.min(13, Math.max(9, Math.min(b.x2 - b.x1, b.y2 - b.y1) * .55));
     out += `<text class="pv-txt" x="${cx.toFixed(1)}" y="${(cy + fs * .36).toFixed(1)}" font-size="${fs.toFixed(1)}" text-anchor="middle">${esc(b.no)}</text>`;
   });
-  (doc.walls || []).forEach(([ax, ay, bx, by]) => { const a = P(ax, ay, WALL), b = P(bx, by, WALL); out += `<line class="pv-wall" stroke-width="2.4" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`; });
+  doc.walls.forEach(({ x1: ax, y1: ay, x2: bx, y2: by }) => { const a = P(ax, ay, WALL), b = P(bx, by, WALL); out += `<line class="pv-wall" stroke-width="2.4" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`; });
   doc.rooms.forEach((r) => {
     const a = [r.x, r.y], b = [r.x + r.w, r.y], d = [r.x, r.y + r.h];
-    if (pvIso && !(doc.walls || []).length) { const up = (p) => P(p[0], p[1], WALL), dn = (p) => P(p[0], p[1], 0); out += `<polyline class="pv-wall" points="${pts([up(d), up(a), up(b)])}"/>` + [a, b, d].map((p) => `<line class="pv-wall" x1="${dn(p)[0]}" y1="${dn(p)[1]}" x2="${up(p)[0]}" y2="${up(p)[1]}"/>`).join(""); }
+    if (pvIso && !doc.walls.length) { const up = (p) => P(p[0], p[1], WALL), dn = (p) => P(p[0], p[1], 0); out += `<polyline class="pv-wall" points="${pts([up(d), up(a), up(b)])}"/>` + [a, b, d].map((p) => `<line class="pv-wall" x1="${dn(p)[0]}" y1="${dn(p)[1]}" x2="${up(p)[0]}" y2="${up(p)[1]}"/>`).join(""); }
     const [tx, ty] = P(r.lx ?? r.x + r.w / 2, r.ly ?? r.y + r.h / 2, 0);
     out += `<text class="pv-label" x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-size="${r.short ? 15 : 20}" text-anchor="middle">${esc(r.name)}</text>`;
   });
@@ -709,7 +769,8 @@ document.addEventListener("keydown", (e) => {
   if (k === "delete" || k === "backspace") { e.preventDefault(); del(); return; }
   const step = e.shiftKey ? 10 : 1;
   if (sel.size && e.key.startsWith("Arrow")) { e.preventDefault(); nudge(e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0, e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0); return; }
-  const tk = { v: "select", r: "room", b: "booth", s: "row", h: "pan" }[k]; if (tk && loaded) { setTool(tk); return; }
+  const tk = { v: "select", r: "room", b: "booth", s: "row", w: "wall", p: "path", h: "pan" }[k]; if (tk && loaded) { setTool(tk); return; }
+  if (k === "t") { rotate(); return; }
   if (k === "g") $("#t-grid").click();
   if (k === "f") fit();
 });
