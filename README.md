@@ -136,6 +136,7 @@
 5. **設定値を入れる**：「Settings」→「Variables and Secrets」→「Add」
    - `SITE_ORIGIN`（Text）：`https://kua-stuhub.github.io`
    - `EXPORT_TOKEN`（Secret）：集計を取り出すときの合言葉（長めの英数字。共有パスワード管理アプリに保存）
+   - `VIEW_TOKENS`（Secret・任意）：見るだけの合言葉。集計は見られるが、QRコードの登録・変更はできない。`abc123,def456` のようにカンマ区切りで複数入れられる。1つ消せばその合言葉だけ使えなくなる
 6. Worker の URL（`https://butsuhan-analytics.〇〇.workers.dev`）をコピーして、`config.json` の `analytics.endpoint` に書いて push
 
 > ⚠ EXPORT_TOKEN はパスワードと同じです。コードやチャットに書かないでください。

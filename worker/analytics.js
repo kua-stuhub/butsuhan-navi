@@ -9,11 +9,20 @@
 // 必要な設定（Cloudflare の画面で行う。README「アクセス解析」参照）
 //   D1 のバインディング  DB          … schema.sql のテーブルを作ったデータベース
 //   変数                 SITE_ORIGIN … https://kua-stuhub.github.io（ここ以外からの送信は受け取らない）
-//   シークレット         EXPORT_TOKEN … 集計を取り出すときの合言葉
+//   シークレット         EXPORT_TOKEN … 集計を取り出すときの合言葉（QRコードの登録・変更もできる）
+//   シークレット（任意） VIEW_TOKENS  … 見るだけの合言葉。カンマ区切りで複数入れられる（QRコードの変更はできない）
 //   変数（任意）         SITE_URL    … 公開サイトのURL（QRコードの行き先）。省略時は SITE_ORIGIN/butsuhan-navi/
 //   変数（任意）         SITE_DATA   … 公開サイトの data.json のURL。省略時は SITE_URL/data.json
 //
 // IP アドレスなど、送信元を見分ける情報は保存しない。
+
+// 合言葉の種類。EXPORT_TOKEN は運営（全部できる）、VIEW_TOKENS は見るだけ
+function tokenLevel(env, t) {
+  if (!t) return "";
+  if (env.EXPORT_TOKEN && t === env.EXPORT_TOKEN) return "admin";
+  const views = String(env.VIEW_TOKENS || "").split(",").map((x) => x.trim()).filter(Boolean);
+  return views.includes(t) ? "view" : "";
+}
 
 const MAX_BYTES = 16384, MAX_KEYS = 200, MAX_COUNT = 500;
 // 受け取るキーの形。これ以外は捨てる
@@ -55,7 +64,7 @@ export default {
     }
 
     if (req.method === "GET" && url.pathname === "/export") {
-      if (!env.EXPORT_TOKEN || url.searchParams.get("token") !== env.EXPORT_TOKEN) return new Response("forbidden", { status: 403 });
+      if (!tokenLevel(env, url.searchParams.get("token"))) return new Response("forbidden", { status: 403 });
       const { results } = await env.DB.prepare(
         "SELECT j.key AS key, SUM(j.value) AS n FROM batches, json_each(batches.data) AS j GROUP BY j.key ORDER BY j.key"
       ).all();
@@ -88,7 +97,8 @@ export default {
     }
 
     if (url.pathname === "/qr" && (req.method === "GET" || req.method === "POST")) {
-      if (!env.EXPORT_TOKEN || url.searchParams.get("token") !== env.EXPORT_TOKEN) return new Response("forbidden", { status: 403 });
+      const level = tokenLevel(env, url.searchParams.get("token"));
+      if (!level || (req.method === "POST" && level !== "admin")) return new Response("forbidden", { status: 403 });
       // QRコードの表は、はじめて使ったときに作る（D1 の画面で SQL を流さなくてよいように）
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS qr_codes (code TEXT PRIMARY KEY, label TEXT NOT NULL, memo TEXT NOT NULL DEFAULT '', created TEXT NOT NULL)").run();
       if (req.method === "POST") {
@@ -603,6 +613,7 @@ function renderQr() {
 }
 async function qrApi(body) {
   var r = await fetch("qr?token=" + encodeURIComponent(store.get()), body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : { cache: "no-store" });
+  if (body && r.status === 403) throw new Error("この合言葉は見るだけ用なので、QRコードの登録・変更はできません");
   if (!r.ok) throw new Error("QRコードの一覧を" + (body ? "保存" : "読め") + "ませんでした（" + r.status + "）");
   QR = (await r.json()).codes || [];
 }
