@@ -8,7 +8,7 @@
 //      → reports/<スペース>_<サークル名>.png ができる。1出展者だけなら最後に出展者の id を足す
 //
 // 載せるもの：お品書き（詳細）を開かれた回数（サイト訪問100回あたり何回か）・写真を開かれた回数・
-// お気に入り（追加−解除）・共有された回数、見られた時間帯、写真が何枚目まで見られたか、サイト全体の合計1行。他の出展者との比較や順位は出さない。
+// お気に入り（追加−解除）・共有された回数（この2つは1枚の小さいカードにまとめ、サイト全体の件数を添える）、見られた時間帯、写真が何枚目まで見られたか、サイト全体の合計1行。他の出展者との比較や順位は出さない。
 // 文字は opentype.js で図形にして描くので、どの環境でも同じ見た目になる（フォントは assets/fonts/）。
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -22,6 +22,11 @@ const sharp = (await import("sharp")).default;
 const opentype = (await import("opentype.js")).default;
 const font = async (n) => { const b = await fs.readFile(path.join(root, "assets", "fonts", n + ".ttf")); return opentype.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)); };
 const [JP_B, JP_M, NUM] = await Promise.all([font("ZenKakuGothicNew-Bold"), font("ZenKakuGothicNew-Medium"), font("Barlow-SemiBold")]);
+// サークル名に Zen Kaku Gothic にない文字（✋ ₃ ᘌ など）があるときに使う予備のフォント。見つかったものだけ使う
+const FALLBACK = [];
+for (const p of ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", "/usr/share/fonts/truetype/freefont/FreeSans.ttf", "/usr/share/fonts/truetype/freefont/FreeSerif.ttf"]) {
+  try { const b = await fs.readFile(p); FALLBACK.push(opentype.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength))); } catch {}
+}
 const cfg = JSON.parse(await fs.readFile(path.join(root, "config.json"), "utf8"));
 const layout = JSON.parse(await fs.readFile(path.join(root, "data", "layout.json"), "utf8").catch(() => "{}"));
 
@@ -34,13 +39,27 @@ const jst = (iso) => new Date(Date.parse(iso) + 9 * 3600e3);
 const md = (d) => `${d.getUTCMonth() + 1}.${String(d.getUTCDate()).padStart(2, "0")}`;
 const period = exp.first ? `集計 ${md(jst(exp.first))}–${exp.until ? md(new Date(exp.until + "T00:00:00Z")) : md(jst(exp.last || exp.first))}` : String(cfg.event?.dates || "");
 // サイト全体の数字（順位や中央値は出さない。自分の数字の大きさの目安として1行だけ）
-const totalDetail = Object.entries(counts).reduce((a, [k, v]) => (/^d:/.test(k) ? a + v : a), 0);
+const sumOf = (re) => Object.entries(counts).reduce((a, [k, v]) => (re.test(k) ? a + v : a), 0);
+const totalDetail = sumOf(/^d:/), totalFav = Math.max(0, sumOf(/^f\+:/) - sumOf(/^f-:/)), totalShare = sumOf(/^s:/);
 
 /* ---------- 描画の道具 ---------- */
 const W = 1920, H = 1080, M = 96;
 const C = { bg: "#F4F5F6", card: "#FFFFFF", fg: "#1F1E1C", muted: "#6B6E73", faint: "#9A9DA2", line: "#DADDE0", accent: "#C8553D", accentSoft: "#F3DCD5", bar: "#C8553D", barSoft: "#E9D3CC" };
-const adv = (f, s, size) => f.getAdvanceWidth(String(s), size, { kerning: true });
-const text = (f, s, x, y, size, fill) => `<path fill="${fill}" d="${f.getPath(String(s), x, y, size, { kerning: true }).toPathData(1)}"/>`;
+// 文字ごとに、その文字を持っているフォントで描く（ふだんは指定のフォントだけで1回で済む）
+function runs(f, str) {
+  const out = [];
+  for (const ch of String(str)) {
+    const use = /\s/.test(ch) || f.charToGlyphIndex(ch) ? f : FALLBACK.find((g) => g.charToGlyphIndex(ch)) || f;
+    if (out.length && out[out.length - 1][0] === use) out[out.length - 1][1] += ch; else out.push([use, ch]);
+  }
+  return out;
+}
+const adv = (f, s, size) => runs(f, s).reduce((a, [g, t]) => a + g.getAdvanceWidth(t, size, { kerning: true }), 0);
+const text = (f, s, x, y, size, fill) => {
+  let d = "", cx = x;
+  for (const [g, t] of runs(f, s)) { d += g.getPath(t, cx, y, size, { kerning: true }).toPathData(1); cx += g.getAdvanceWidth(t, size, { kerning: true }); }
+  return `<path fill="${fill}" d="${d}"/>`;
+};
 const right = (f, s, x, y, size, fill) => text(f, s, x - adv(f, s, size), y, size, fill);
 const center = (f, s, x, y, size, fill) => text(f, s, x - adv(f, s, size) / 2, y, size, fill);
 const fmt = (v) => Number(v).toLocaleString("ja-JP");
@@ -109,14 +128,13 @@ function slide(e) {
   nm.lines.forEach((ln, i) => (s += text(JP_B, ln, nx, nTop + i * nm.size * 1.25, nm.size, C.fg)));
   s += `<rect x="${nx - 40}" y="168" width="2" height="104" fill="${C.line}"/>`;
 
-  // 数字4つ
-  const ky = 330, kh = 250, gap = 28, kw = (W - M * 2 - gap * 3) / 4;
+  // 数字：大きいカード2枚（開かれた回数・写真）と、お気に入り・共有をまとめた小さいカード1枚
+  // お気に入りと共有は使った人が少なく 0 の組が多いので、大きな 0 を並べず、サイト全体の件数を添える
+  const ky = 330, kh = 250, gap = 28, kw = (W - M * 2 - gap * 2) / 3;
   const pv = n("pv"), per100 = pv ? (d / pv * 100 < 10 ? (d / pv * 100).toFixed(1) : Math.round(d / pv * 100)) : 0;
   const kpis = [
     ["お品書きを開かれた回数", d, pv && d ? `サイト訪問100回あたり 約${per100}回` : ""],
     ["写真を開かれた回数", p, p && d ? `開いた人のうち ${Math.round(Math.min(1, p / d) * 100)}% が写真まで` : ""],
-    ["お気に入り登録", fav, "追加された数から解除を引いた数"],
-    ["共有された回数", sh, "共有ボタンが押された回数"],
   ];
   kpis.forEach(([label, v, sub], i) => {
     const x = M + i * (kw + gap);
@@ -124,6 +142,13 @@ function slide(e) {
     s += text(NUM, fmt(v), x + 34, ky + 168, 104, i === 0 ? C.accent : C.fg);
     if (sub) s += text(JP_M, sub, x + 36, ky + 218, 22, C.muted);
   });
+  const fx = M + 2 * (kw + gap), half = (kw - 72) / 2;
+  s += card(fx, ky, kw, kh);
+  [["お気に入り登録", Math.max(0, fav)], ["共有された回数", sh]].forEach(([label, v], i) => {
+    const x = fx + 36 + i * half;
+    s += text(JP_M, label, x, ky + 62, 24, C.muted) + text(NUM, fmt(v), x - 2, ky + 150, 72, C.fg);
+  });
+  s += text(JP_M, `サイト全体でも お気に入り ${fmt(totalFav)}件・共有 ${fmt(totalShare)}件の機能です`, fx + 36, ky + 218, 20, C.muted);
 
   // 下段：時間帯（横棒）と写真の何枚目まで（縦棒）
   const by = 612, bh = 330, lw = 900, rw = W - M * 2 - lw - gap;
@@ -154,7 +179,7 @@ function slide(e) {
   const pvAll = n("pv");
   const whole = `サイト全体（同じ期間）：サイト訪問 ${fmt(pvAll)}回・お品書きが開かれた回数 ${fmt(totalDetail)}回・掲載 ${fmt(exhibitors.length)}組`;
   s += text(JP_M, whole, M, 996, 22, C.fg);
-  s += text(JP_M, "集計に協力いただいた来場者の閲覧のみを数えています。個人を特定する情報は含まず、他の出展者との順位はお伝えしていません。", M, 1030, 20, C.muted);
+  s += text(JP_M, "集計に協力いただいた来場者の閲覧のみを数えています。個人を特定する情報は含みません。", M, 1030, 20, C.muted);
   if (org) s += right(JP_M, `運営：${org}`, W - M, 1030, 20, C.muted);
   return s + "</svg>";
 }
