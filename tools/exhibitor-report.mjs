@@ -22,6 +22,11 @@ const sharp = (await import("sharp")).default;
 const opentype = (await import("opentype.js")).default;
 const font = async (n) => { const b = await fs.readFile(path.join(root, "assets", "fonts", n + ".ttf")); return opentype.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength)); };
 const [JP_B, JP_M, NUM] = await Promise.all([font("ZenKakuGothicNew-Bold"), font("ZenKakuGothicNew-Medium"), font("Barlow-SemiBold")]);
+// サークル名に Zen Kaku Gothic にない文字（✋ ₃ ᘌ など）があるときに使う予備のフォント。見つかったものだけ使う
+const FALLBACK = [];
+for (const p of ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf", "/usr/share/fonts/truetype/freefont/FreeSans.ttf", "/usr/share/fonts/truetype/freefont/FreeSerif.ttf"]) {
+  try { const b = await fs.readFile(p); FALLBACK.push(opentype.parse(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength))); } catch {}
+}
 const cfg = JSON.parse(await fs.readFile(path.join(root, "config.json"), "utf8"));
 const layout = JSON.parse(await fs.readFile(path.join(root, "data", "layout.json"), "utf8").catch(() => "{}"));
 
@@ -40,8 +45,21 @@ const totalDetail = sumOf(/^d:/), totalFav = Math.max(0, sumOf(/^f\+:/) - sumOf(
 /* ---------- 描画の道具 ---------- */
 const W = 1920, H = 1080, M = 96;
 const C = { bg: "#F4F5F6", card: "#FFFFFF", fg: "#1F1E1C", muted: "#6B6E73", faint: "#9A9DA2", line: "#DADDE0", accent: "#C8553D", accentSoft: "#F3DCD5", bar: "#C8553D", barSoft: "#E9D3CC" };
-const adv = (f, s, size) => f.getAdvanceWidth(String(s), size, { kerning: true });
-const text = (f, s, x, y, size, fill) => `<path fill="${fill}" d="${f.getPath(String(s), x, y, size, { kerning: true }).toPathData(1)}"/>`;
+// 文字ごとに、その文字を持っているフォントで描く（ふだんは指定のフォントだけで1回で済む）
+function runs(f, str) {
+  const out = [];
+  for (const ch of String(str)) {
+    const use = /\s/.test(ch) || f.charToGlyphIndex(ch) ? f : FALLBACK.find((g) => g.charToGlyphIndex(ch)) || f;
+    if (out.length && out[out.length - 1][0] === use) out[out.length - 1][1] += ch; else out.push([use, ch]);
+  }
+  return out;
+}
+const adv = (f, s, size) => runs(f, s).reduce((a, [g, t]) => a + g.getAdvanceWidth(t, size, { kerning: true }), 0);
+const text = (f, s, x, y, size, fill) => {
+  let d = "", cx = x;
+  for (const [g, t] of runs(f, s)) { d += g.getPath(t, cx, y, size, { kerning: true }).toPathData(1); cx += g.getAdvanceWidth(t, size, { kerning: true }); }
+  return `<path fill="${fill}" d="${d}"/>`;
+};
 const right = (f, s, x, y, size, fill) => text(f, s, x - adv(f, s, size), y, size, fill);
 const center = (f, s, x, y, size, fill) => text(f, s, x - adv(f, s, size) / 2, y, size, fill);
 const fmt = (v) => Number(v).toLocaleString("ja-JP");
