@@ -326,14 +326,8 @@ function seoMeta() {
   const http = /^https?:\/\//.test(siteUrl);
   if (http) out.push(`<link rel="canonical" href="${escXml(siteUrl)}">`);
   if (cfg.site?.googleSiteVerification) out.push(`<meta name="google-site-verification" content="${escXml(cfg.site.googleSiteVerification)}">`);
-  const event = {
-    "@type": "Event",
-    name: `${ev.name}${ev.year}`,
-    ...(ev.start && { startDate: ev.start }),
-    ...(ev.end && { endDate: ev.end }),
-    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
-    ...(ev.venue && { location: { "@type": "Place", name: ev.venue } }),
-  };
+  // 祭そのものは Event 型にしない。Google がイベントのリッチリザルト候補として扱い、主催者しか知らない項目（料金・出演者など）を求めてくるため。非公式サイトなので題材として名前を示すだけにする
+  const about = { "@type": "Thing", name: `${ev.name}${ev.year}` };
   out.push(jsonLd({
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -343,7 +337,7 @@ function seoMeta() {
     inLanguage: "ja",
     ...(http && { url: siteUrl }),
     ...(cfg.org?.name && { publisher: { "@type": "Organization", name: cfg.org.name, ...(cfg.org.url && { url: cfg.org.url }) } }),
-    about: event,
+    about,
   }));
   return out.join("\n");
 }
