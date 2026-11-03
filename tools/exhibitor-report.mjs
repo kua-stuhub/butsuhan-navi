@@ -179,7 +179,7 @@ function slide(e) {
   const pvAll = n("pv");
   const whole = `サイト全体（同じ期間）：サイト訪問 ${fmt(pvAll)}回・お品書きが開かれた回数 ${fmt(totalDetail)}回・掲載 ${fmt(exhibitors.length)}組`;
   s += text(JP_M, whole, M, 996, 22, C.fg);
-  s += text(JP_M, "集計に協力いただいた来場者の閲覧のみを数えています。個人を特定する情報は含まず、他の出展者との順位はお伝えしていません。", M, 1030, 20, C.muted);
+  s += text(JP_M, "集計に協力いただいた来場者の閲覧のみを数えています。個人を特定する情報は含みません。", M, 1030, 20, C.muted);
   if (org) s += right(JP_M, `運営：${org}`, W - M, 1030, 20, C.muted);
   return s + "</svg>";
 }
