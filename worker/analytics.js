@@ -56,19 +56,25 @@ export default {
 
     if (req.method === "GET" && url.pathname === "/export") {
       if (!env.EXPORT_TOKEN || url.searchParams.get("token") !== env.EXPORT_TOKEN) return new Response("forbidden", { status: 403 });
+      // ?until=2026-11-02 … その日（日本時間）の終わりまでに受け取った分だけ数える（出展者レポートの締め用）
+      const until = url.searchParams.get("until") || "";
+      if (until && !/^\d{4}-\d{2}-\d{2}$/.test(until)) return new Response("until は 2026-11-02 の形で", { status: 400 });
+      const end = until ? new Date(Date.parse(until + "T00:00:00+09:00") + 86400e3) : null;
+      if (end && isNaN(end)) return new Response("until の日付が正しくありません", { status: 400 });
+      const batches = end ? `(SELECT * FROM batches WHERE at < '${end.toISOString()}') AS batches` : "batches";
       const { results } = await env.DB.prepare(
-        "SELECT j.key AS key, SUM(j.value) AS n FROM batches, json_each(batches.data) AS j GROUP BY j.key ORDER BY j.key"
+        `SELECT j.key AS key, SUM(j.value) AS n FROM ${batches}, json_each(batches.data) AS j GROUP BY j.key ORDER BY j.key`
       ).all();
-      const { results: meta } = await env.DB.prepare("SELECT COUNT(*) AS batches, MIN(at) AS first, MAX(at) AS last FROM batches").all();
+      const { results: meta } = await env.DB.prepare(`SELECT COUNT(*) AS batches, MIN(at) AS first, MAX(at) AS last FROM ${batches}`).all();
       // 日本時間の日付ごとの送信数・はじめての端末の数（受け取った日で分ける）
       const { results: recv } = await env.DB.prepare(
-        "SELECT substr(datetime(at, '+9 hours'), 1, 10) AS day, COUNT(*) AS batches, SUM(COALESCE(json_extract(data, '$.pv'), 0)) AS pv, SUM(COALESCE(json_extract(data, '$.nv'), 0)) AS nv FROM batches GROUP BY day ORDER BY day"
+        `SELECT substr(datetime(at, '+9 hours'), 1, 10) AS day, COUNT(*) AS batches, SUM(COALESCE(json_extract(data, '$.pv'), 0)) AS pv, SUM(COALESCE(json_extract(data, '$.nv'), 0)) AS nv FROM ${batches} GROUP BY day ORDER BY day`
       ).all();
       // 日付ごとの時間帯。hd:日付:時 はページを開いた日。古い h:時 は日付を持たないので受け取った日で代用
       const { results: hours } = await env.DB.prepare(
         "SELECT day, h, SUM(n) AS n FROM (" +
-        "SELECT substr(j.key, 4, 10) AS day, CAST(substr(j.key, 15) AS INTEGER) AS h, j.value AS n FROM batches, json_each(batches.data) AS j WHERE j.key LIKE 'hd:%' " +
-        "UNION ALL SELECT substr(datetime(at, '+9 hours'), 1, 10), CAST(substr(j.key, 3) AS INTEGER), j.value FROM batches, json_each(batches.data) AS j WHERE j.key LIKE 'h:%'" +
+        `SELECT substr(j.key, 4, 10) AS day, CAST(substr(j.key, 15) AS INTEGER) AS h, j.value AS n FROM ${batches}, json_each(batches.data) AS j WHERE j.key LIKE 'hd:%' ` +
+        `UNION ALL SELECT substr(datetime(at, '+9 hours'), 1, 10), CAST(substr(j.key, 3) AS INTEGER), j.value FROM ${batches}, json_each(batches.data) AS j WHERE j.key LIKE 'h:%'` +
         ") GROUP BY day, h ORDER BY day, h"
       ).all();
       // 日別のページを開いた回数も、開いた日で数え直す（ページを開くたびに時間帯も1つ数えているので合計は同じ）
@@ -76,7 +82,7 @@ export default {
       for (const r of recv) by[r.day] = { day: r.day, batches: r.batches, pv: 0, nv: r.nv };
       for (const r of hours) (by[r.day] ||= { day: r.day, batches: 0, pv: 0, nv: 0 }).pv += r.n;
       const daily = Object.values(by).sort((a, b) => (a.day < b.day ? -1 : 1));
-      return Response.json({ ...meta[0], daily, hours, counts: Object.fromEntries(results.map((r) => [r.key, r.n])) });
+      return Response.json({ ...meta[0], until: until || null, daily, hours, counts: Object.fromEntries(results.map((r) => [r.key, r.n])) });
     }
 
     if (req.method === "GET" && url.pathname === "/dashboard") {

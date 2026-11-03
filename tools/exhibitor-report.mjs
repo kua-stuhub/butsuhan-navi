@@ -1,13 +1,14 @@
 // 出展者に渡すレポートを、1出展者1枚の画像（1920×1080、スライド1枚分）で作る
 //
 // 使い方:
-//   1. <Workers のURL>/export?token=<EXPORT_TOKEN> を開いて export.json として保存
+//   1. <Workers のURL>/export?token=<EXPORT_TOKEN>&until=<締めの日 例 2026-11-02> を開いて export.json として保存
+//      （until を付けると、その日の終わり（日本時間）までに届いた分だけになる。右上の集計期間もその日まで）
 //   2. 公開サイトの data.json（https://kua-stuhub.github.io/butsuhan-navi/data.json）を保存
 //   3. node tools/exhibitor-report.mjs export.json data.json reports/
 //      → reports/<スペース>_<サークル名>.png ができる。1出展者だけなら最後に出展者の id を足す
 //
 // 載せるもの：お品書き（詳細）を開かれた回数（サイト訪問100回あたり何回か）・写真を開かれた回数・
-// お気に入り（追加−解除）・共有された回数、見られた時間帯、写真が何枚目まで見られたか。他の出展者との比較や順位は出さない。
+// お気に入り（追加−解除）・共有された回数、見られた時間帯、写真が何枚目まで見られたか、サイト全体の合計1行。他の出展者との比較や順位は出さない。
 // 文字は opentype.js で図形にして描くので、どの環境でも同じ見た目になる（フォントは assets/fonts/）。
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -24,9 +25,16 @@ const [JP_B, JP_M, NUM] = await Promise.all([font("ZenKakuGothicNew-Bold"), font
 const cfg = JSON.parse(await fs.readFile(path.join(root, "config.json"), "utf8"));
 const layout = JSON.parse(await fs.readFile(path.join(root, "data", "layout.json"), "utf8").catch(() => "{}"));
 
-const { counts = {} } = JSON.parse(await fs.readFile(exportPath, "utf8"));
+const exp = JSON.parse(await fs.readFile(exportPath, "utf8"));
+const { counts = {} } = exp;
 const { exhibitors = [] } = JSON.parse(await fs.readFile(dataPath, "utf8"));
 const n = (k) => counts[k] || 0;
+// 集計期間（日本時間）。export の最初と最後の受け取り日時から作る。?until= で締めたときはその日を終わりにする
+const jst = (iso) => new Date(Date.parse(iso) + 9 * 3600e3);
+const md = (d) => `${d.getUTCMonth() + 1}.${String(d.getUTCDate()).padStart(2, "0")}`;
+const period = exp.first ? `集計 ${md(jst(exp.first))}–${exp.until ? md(new Date(exp.until + "T00:00:00Z")) : md(jst(exp.last || exp.first))}` : String(cfg.event?.dates || "");
+// サイト全体の数字（順位や中央値は出さない。自分の数字の大きさの目安として1行だけ）
+const totalDetail = Object.entries(counts).reduce((a, [k, v]) => (/^d:/.test(k) ? a + v : a), 0);
 
 /* ---------- 描画の道具 ---------- */
 const W = 1920, H = 1080, M = 96;
@@ -68,7 +76,7 @@ const card = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}"
 
 function slide(e) {
   const ev = cfg.event, d = n(`d:${e.id}`), p = n(`p:${e.id}`), fav = n(`f+:${e.id}`) - n(`f-:${e.id}`), sh = n(`s:${e.id}`);
-  const when = [["開催前", "pre"], ["当日 〜12時", "am"], ["当日 12〜14時", "mid"], ["当日 14時〜", "pm"]].map(([l, k]) => [l, n(`dh:${e.id}:${k}`)]);
+  const when = [["開催前", "pre"], ["当日 〜12時", "am"], ["当日 12〜14時", "mid"], ["当日 14時〜・終了後", "pm"]].map(([l, k]) => [l, n(`dh:${e.id}:${k}`)]);
   const imgs = Math.max(1, Math.min(5, (e.images || []).length || 5));
   const pages = Array.from({ length: imgs }, (_, i) => [`${i + 1}枚目`, n(`pg:${e.id}:${i + 1}`)]);
   const room = (layout.rooms || []).find((r) => { const b = (layout.booths || []).find((b) => String(b[0]) === e.space); if (!b) return false; const cx = (b[1] + b[2]) / 2, cy = (b[3] + b[4]) / 2; return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h; });
@@ -82,7 +90,7 @@ function slide(e) {
   s += `<rect x="${hx.toFixed(1)}" y="76" width="${(adv(NUM, year, 28) + 16).toFixed(1)}" height="36" rx="6" fill="${C.fg}"/>` + text(NUM, year, hx + 8, 104, 28, C.bg);
   hx += adv(NUM, year, 28) + 28;
   s += text(JP_M, "物販ナビ 閲覧レポート", hx, 104, 30, C.fg);
-  s += right(NUM, String(ev.dates || ""), W - M, 104, 30, C.muted);
+  s += right(JP_M, period, W - M, 104, 28, C.muted);
 
   // スペースとサークル名
   const no = e.space || "—";
@@ -105,8 +113,8 @@ function slide(e) {
   const ky = 330, kh = 250, gap = 28, kw = (W - M * 2 - gap * 3) / 4;
   const pv = n("pv"), per100 = pv ? (d / pv * 100 < 10 ? (d / pv * 100).toFixed(1) : Math.round(d / pv * 100)) : 0;
   const kpis = [
-    ["お品書きを開かれた回数", d, pv ? `サイト訪問100回あたり 約${per100}回` : ""],
-    ["写真を開かれた回数", p, d ? `開いた人のうち ${Math.round(Math.min(1, p / d) * 100)}% が写真まで` : ""],
+    ["お品書きを開かれた回数", d, pv && d ? `サイト訪問100回あたり 約${per100}回` : ""],
+    ["写真を開かれた回数", p, p && d ? `開いた人のうち ${Math.round(Math.min(1, p / d) * 100)}% が写真まで` : ""],
     ["お気に入り登録", fav, "追加された数から解除を引いた数"],
     ["共有された回数", sh, "共有ボタンが押された回数"],
   ];
@@ -120,7 +128,7 @@ function slide(e) {
   // 下段：時間帯（横棒）と写真の何枚目まで（縦棒）
   const by = 612, bh = 330, lw = 900, rw = W - M * 2 - lw - gap;
   s += card(M, by, lw, bh) + text(JP_B, "いつ見られたか", M + 36, by + 58, 30, C.fg) + text(JP_M, "お品書きを開かれた回数", M + 36 + adv(JP_B, "いつ見られたか", 30) + 20, by + 58, 22, C.muted);
-  const wmax = Math.max(1, ...when.map((w) => w[1])), lx = M + 36, bx = M + 270, bw = lw - 270 - 130;
+  const wmax = Math.max(1, ...when.map((w) => w[1])), lx = M + 36, bx = M + 310, bw = lw - 310 - 130;
   when.forEach(([l, v], i) => {
     const y = by + 108 + i * 54;
     s += text(JP_M, l, lx, y + 26, 24, C.fg);
@@ -133,8 +141,9 @@ function slide(e) {
   s += card(rx, by, rw, bh) + text(JP_B, "写真は何枚目まで見られたか", rx + 36, by + 58, 30, C.fg);
   const pmax = Math.max(1, ...pages.map((q) => q[1])), px = rx + 48, pw = rw - 96, ph = 150, pb = by + bh - 64;
   const colW = pw / pages.length, barW = Math.min(110, colW * 0.6);
-  s += `<rect x="${px}" y="${pb}" width="${pw}" height="2" fill="${C.line}"/>`;
-  pages.forEach(([l, v], i) => {
+  if (!p) s += center(JP_M, "まだ写真は開かれていません", rx + rw / 2, by + bh / 2 + 24, 28, C.faint);
+  else s += `<rect x="${px}" y="${pb}" width="${pw}" height="2" fill="${C.line}"/>`;
+  if (p) pages.forEach(([l, v], i) => {
     const cx = px + colW * (i + 0.5), h = ph * v / pmax;
     if (v) s += `<rect x="${(cx - barW / 2).toFixed(1)}" y="${(pb - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="8" fill="${i ? C.barSoft : C.bar}"/>`;
     s += center(NUM, fmt(v), cx, pb - h - 14, 28, C.fg) + center(JP_M, l, cx, pb + 38, 22, C.muted);
@@ -142,9 +151,11 @@ function slide(e) {
 
   // 注記
   const org = cfg.org?.name || "";
-  ["本サイトでの集計にご協力いただいた来場者の閲覧のみを数えています。個人を特定する情報は含みません。", "他の出展者との順位はお伝えしていません。"]
-    .forEach((ln, i) => (s += text(JP_M, ln, M, 996 + i * 32, 21, C.muted)));
-  if (org) s += right(JP_M, `運営：${org}`, W - M, 996, 21, C.muted);
+  const pvAll = n("pv");
+  const whole = `サイト全体（同じ期間）：サイト訪問 ${fmt(pvAll)}回・お品書きが開かれた回数 ${fmt(totalDetail)}回・掲載 ${fmt(exhibitors.length)}組`;
+  s += text(JP_M, whole, M, 996, 22, C.fg);
+  s += text(JP_M, "集計に協力いただいた来場者の閲覧のみを数えています。個人を特定する情報は含まず、他の出展者との順位はお伝えしていません。", M, 1030, 20, C.muted);
+  if (org) s += right(JP_M, `運営：${org}`, W - M, 1030, 20, C.muted);
   return s + "</svg>";
 }
 
